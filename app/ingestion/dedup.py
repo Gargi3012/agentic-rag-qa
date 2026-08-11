@@ -6,14 +6,19 @@ from app.ingestion.chunker import Chunk
 
 logger = logging.getLogger("agentic_rag.ingestion.dedup")
 
+import os
+
 def generate_chunk_id(text: str, file_path: str) -> str:
     """
     Generates a deterministic UUID based on the SHA-256 hash of the chunk text
     and the file path. This guarantees idempotency: re-ingesting the same file
     produces identical IDs.
     """
+    # Normalize path to prevent Windows case-sensitivity or slash differences from causing hash mismatches
+    normalized_path = os.path.abspath(file_path).replace("\\", "/").lower()
+    
     hasher = hashlib.sha256()
-    hasher.update(file_path.encode("utf-8"))
+    hasher.update(normalized_path.encode("utf-8"))
     hasher.update(text.encode("utf-8"))
     hash_hex = hasher.hexdigest()
     

@@ -2,91 +2,91 @@
   {
     "id": "q1",
     "query": "What is Qdrant designed for?",
-    "relevant_chunk_ids": ["de155c3c-9a83-55f1-98ca-6e3e3b50612c"],
+    "relevant_chunk_ids": ["20da95a1-d819-57a5-bbe0-3bfc49e60ab9"],
     "gold_answer": "Qdrant is a self-hosted vector database designed for high-performance vector search."
   },
   {
     "id": "q2",
     "query": "How do you enable hybrid search in Qdrant?",
-    "relevant_chunk_ids": ["de155c3c-9a83-55f1-98ca-6e3e3b50612c"],
+    "relevant_chunk_ids": ["20da95a1-d819-57a5-bbe0-3bfc49e60ab9"],
     "gold_answer": "To enable hybrid search in Qdrant, you must configure both dense (semantic search using cosine distance) and sparse (keyword match frequencies like BM25) vector indexes."
   },
   {
     "id": "q3",
     "query": "What distance metric does dense search use in Qdrant?",
-    "relevant_chunk_ids": ["de155c3c-9a83-55f1-98ca-6e3e3b50612c"],
+    "relevant_chunk_ids": ["20da95a1-d819-57a5-bbe0-3bfc49e60ab9"],
     "gold_answer": "Dense search in Qdrant models semantic meaning using cosine distance."
   },
   {
     "id": "q4",
     "query": "What is the formula for Reciprocal Rank Fusion (RRF)?",
-    "relevant_chunk_ids": ["de155c3c-9a83-55f1-98ca-6e3e3b50612c"],
+    "relevant_chunk_ids": ["20da95a1-d819-57a5-bbe0-3bfc49e60ab9"],
     "gold_answer": "The RRF formula is Score = Sum( 1 / (rank + k) ) where rank is the document rank and k is a constant parameter."
   },
   {
     "id": "q5",
     "query": "What does parameter k do in the RRF formula?",
-    "relevant_chunk_ids": ["de155c3c-9a83-55f1-98ca-6e3e3b50612c"],
+    "relevant_chunk_ids": ["20da95a1-d819-57a5-bbe0-3bfc49e60ab9"],
     "gold_answer": "The constant parameter k (often set to 60) in the RRF formula penalizes low-ranked documents, guaranteeing high-ranking consistency across diverse embedding spaces."
   },
   {
     "id": "q6",
     "query": "What web framework is FastAPI built on top of?",
-    "relevant_chunk_ids": ["57153179-9268-5657-8cc4-da441ec67f78"],
+    "relevant_chunk_ids": ["99ebe920-740d-525f-b1e6-52ad55b3fe22"],
     "gold_answer": "FastAPI is built on top of Starlette and Pydantic."
   },
   {
     "id": "q7",
     "query": "How does FastAPI manage shared connections and auth credentials?",
-    "relevant_chunk_ids": ["57153179-9268-5657-8cc4-da441ec67f78"],
+    "relevant_chunk_ids": ["99ebe920-740d-525f-b1e6-52ad55b3fe22"],
     "gold_answer": "FastAPI leverages a dependency injection system (using Depends) to manage shared database connections, authentication credentials, and request filters."
   },
   {
     "id": "q8",
     "query": "What headers-based auth can you declare in FastAPI?",
-    "relevant_chunk_ids": ["57153179-9268-5657-8cc4-da441ec67f78"],
+    "relevant_chunk_ids": ["99ebe920-740d-525f-b1e6-52ad55b3fe22"],
     "gold_answer": "You can declare an API key header check, defining a dependency function that reads the header value, such as extracting X-API-Key."
   },
   {
     "id": "q9",
     "query": "How does FastAPI handle CORS policies?",
-    "relevant_chunk_ids": ["57153179-9268-5657-8cc4-da441ec67f78"],
+    "relevant_chunk_ids": ["99ebe920-740d-525f-b1e6-52ad55b3fe22"],
     "gold_answer": "FastAPI handles CORS policies via CORSMiddleware, protecting the backend from unauthorized cross-origin requests."
   },
   {
     "id": "q10",
     "query": "What libraries does FastAPI use for routing and schema validation?",
-    "relevant_chunk_ids": ["57153179-9268-5657-8cc4-da441ec67f78"],
+    "relevant_chunk_ids": ["99ebe920-740d-525f-b1e6-52ad55b3fe22"],
     "gold_answer": "FastAPI is built on top of Starlette (for routing) and Pydantic (for schema validation)."
   },
   {
     "id": "q11",
     "query": "What does RAG combine to answer questions?",
-    "relevant_chunk_ids": ["61839ca6-9817-5ea7-9b3a-09aa8da65bed"],
+    "relevant_chunk_ids": ["f0486678-0683-54d0-b7e5-af24ca342577"],
     "gold_answer": "Retrieval-Augmented Generation (RAG) combines search retrieval with generative LLMs to answer questions using external domain context."
   },
   {
     "id": "q12",
     "query": "What target chunk size and overlap does the RAG system use?",
-    "relevant_chunk_ids": ["61839ca6-9817-5ea7-9b3a-09aa8da65bed"],
+    "relevant_chunk_ids": ["f0486678-0683-54d0-b7e5-af24ca342577"],
     "gold_answer": "The RAG system uses a target chunk size of 512 tokens with a 50 token overlap."
   },
   {
     "id": "q13",
     "query": "Why integrate a Cross-Encoder like ms-marco-MiniLM-L-6-v2?",
-    "relevant_chunk_ids": ["61839ca6-9817-5ea7-9b3a-09aa8da65bed"],
+    "relevant_chunk_ids": ["f0486678-0683-54d0-b7e5-af24ca342577"],
     "gold_answer": "A Cross-Encoder is integrated to re-rank top retrieval hits because standard dense vector search lacks detailed keyword-document cross-attention."
   },
   {
     "id": "q14",
     "query": "How do you normalize Cross-Encoder log-odds scores?",
-    "relevant_chunk_ids": ["61839ca6-9817-5ea7-9b3a-09aa8da65bed"],
+    "relevant_chunk_ids": ["f0486678-0683-54d0-b7e5-af24ca342577"],
     "gold_answer": "Cross-Encoder log-odds scores are normalized to a [0.0, 1.0] range via a sigmoid function."
   },
   {
     "id": "q15",
     "query": "What is the maximum retry limit for the Critique Pass?",
-    "relevant_chunk_ids": ["61839ca6-9817-5ea7-9b3a-09aa8da65bed"],
+    "relevant_chunk_ids": ["f0486678-0683-54d0-b7e5-af24ca342577"],
     "gold_answer": "The pipeline enforces a hard cap of 1 retry for the Critique Pass to avoid infinite execution loops."
   },
   {
