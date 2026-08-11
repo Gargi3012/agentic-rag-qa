@@ -5,15 +5,15 @@
     "average_ndcg_5": 0.7777777777777778,
     "average_context_precision_5": 0.7777777777777778,
     "average_exact_match": 0.16666666666666666,
-    "average_f1_score": 0.5613852939607348,
+    "average_f1_score": 0.5514547998920322,
     "average_faithfulness_score": 5.0,
     "average_relevance_score": 5.0,
-    "total_cost_usd": 0.0036817499999999997,
-    "average_cost_per_query_usd": 0.00020454166666666665,
-    "p50_retrieval_latency_ms": 1521.8729972839355,
-    "p95_retrieval_latency_ms": 2502.3200273513785,
-    "p50_full_pipeline_latency_ms": 4408.820271492004,
-    "p95_full_pipeline_latency_ms": 7805.818891525263
+    "total_cost_usd": 0.0036824999999999996,
+    "average_cost_per_query_usd": 0.0002045833333333333,
+    "p50_retrieval_latency_ms": 2248.0722665786743,
+    "p95_retrieval_latency_ms": 3223.782849311824,
+    "p50_full_pipeline_latency_ms": 4610.977530479431,
+    "p95_full_pipeline_latency_ms": 6466.593897342672
   },
   "runs": [
     {
@@ -29,7 +29,7 @@
       "retries": 0,
       "cost_usd": 7.32e-05,
       "tokens_used": 479,
-      "latency_ms": 11140.122413635254,
+      "latency_ms": 12338.988780975342,
       "metrics": {
         "recall_1": 0.0,
         "recall_5": 0.0,
@@ -42,7 +42,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. It accurately reflects the lack of information available to answer the user's query about Qdrant. Therefore, it is both faithful to the context and relevant to the user's question."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about Qdrant, the response is both faithful (as it does not fabricate information) and relevant (as it directly addresses the lack of context). Therefore, it scores the highest on both scales."
     },
     {
       "id": "q2",
@@ -61,7 +61,7 @@
       "retries": 0,
       "cost_usd": 0.00030585,
       "tokens_used": 1664,
-      "latency_ms": 4258.8396072387695,
+      "latency_ms": 5238.625764846802,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -74,7 +74,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer is entirely supported by the context provided. It accurately describes the steps needed to enable hybrid search in Qdrant, specifically mentioning the configuration of both dense and sparse vector indexes, which is directly stated in the context. There are no external claims or assumptions made, and the citation correctly references the relevant context. Additionally, the answer directly addresses the user's query without any vagueness or unnecessary information."
+      "judge_explanation": "The generated answer is entirely supported by the context provided. It accurately describes the steps needed to enable hybrid search in Qdrant, specifically mentioning the configuration of both dense and sparse vector indexes, which is directly stated in the context. There are no external claims or assumptions made, and the citation to the relevant context ID further reinforces its groundedness. Additionally, the answer directly addresses the user's query without any vagueness or unnecessary information."
     },
     {
       "id": "q3",
@@ -93,7 +93,7 @@
       "retries": 0,
       "cost_usd": 0.00029564999999999995,
       "tokens_used": 1632,
-      "latency_ms": 4288.053512573242,
+      "latency_ms": 4577.594518661499,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -123,9 +123,9 @@
       "generated_answer": "The formula for Reciprocal Rank Fusion (RRF) is:\n\nScore = Sum( 1 / (rank + k) )\n\nwhere k is a constant parameter (often set to 60) that penalizes low-ranked documents [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00031109999999999997,
-      "tokens_used": 1708,
-      "latency_ms": 4783.043146133423,
+      "cost_usd": 0.00030629999999999996,
+      "tokens_used": 1700,
+      "latency_ms": 5217.069387435913,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -138,7 +138,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately presents the formula for Reciprocal Rank Fusion (RRF) as stated in the context. It includes the correct mathematical expression and explains the role of the constant parameter 'k', which is also mentioned in the context. The citation to the context ID further supports the answer's faithfulness. Additionally, the answer directly addresses the user's query without any extraneous information, making it highly relevant."
+      "judge_explanation": "The generated answer accurately presents the formula for Reciprocal Rank Fusion (RRF) as stated in the context. It includes the necessary details about the formula and the role of the constant parameter k, which is also mentioned in the context. The answer is directly relevant to the user's query and does not introduce any external information or assumptions."
     },
     {
       "id": "q5",
@@ -157,7 +157,7 @@
       "retries": 0,
       "cost_usd": 0.00032744999999999996,
       "tokens_used": 1751,
-      "latency_ms": 4714.532852172852,
+      "latency_ms": 5230.589389801025,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -170,7 +170,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately describes the role of parameter k in the RRF formula as stated in the context. It correctly identifies that k is a constant that penalizes low-ranked documents and mentions the common value of 60. Additionally, it provides the formula for RRF, which is directly supported by the context. The answer is directly relevant to the user's query, providing a clear and concise explanation without any extraneous information."
+      "judge_explanation": "The generated answer accurately describes the role of parameter k in the RRF formula as stated in the context. It correctly identifies that k is a constant that penalizes low-ranked documents and mentions its typical value of 60. Additionally, the answer includes the formula for RRF, which is directly supported by the context provided. Therefore, the answer is both fully grounded in the context and directly relevant to the user's query."
     },
     {
       "id": "q6",
@@ -189,7 +189,7 @@
       "retries": 0,
       "cost_usd": 0.00029969999999999997,
       "tokens_used": 1641,
-      "latency_ms": 4658.989191055298,
+      "latency_ms": 4611.276388168335,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -216,12 +216,12 @@
         "f0486678-0683-54d0-b7e5-af24ca342577"
       ],
       "gold_answer": "FastAPI leverages a dependency injection system (using Depends) to manage shared database connections, authentication credentials, and request filters.",
-      "generated_answer": "FastAPI manages shared database connections and authentication credentials for users through a dependency injection system using `Depends`. This allows for the definition of dependency functions that can handle tasks such as reading header values for authentication. For example, a function can be defined to check an API key from the request header, and if the key does not match a predefined value, it raises an HTTP exception with a 401 status code [cite: 99ebe920-740d-525f-b1e6-52ad55b3fe22].",
+      "generated_answer": "FastAPI manages shared database connections and authentication credentials for users through a dependency injection system using `Depends`. This allows for the definition of dependency functions that can handle tasks such as reading header values for authentication. For example, a function can be defined to check an API key from the request header, and if the key does not match a predefined value, it raises an HTTP exception to indicate unauthorized access [cite: 99ebe920-740d-525f-b1e6-52ad55b3fe22].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00035985,
-      "tokens_used": 1829,
-      "latency_ms": 7217.386484146118,
+      "cost_usd": 0.00035715,
+      "tokens_used": 1823,
+      "latency_ms": 5251.810550689697,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -230,11 +230,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.32608695652173914,
+        "f1_score": 0.3296703296703296,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context about how FastAPI manages shared database connections and authentication credentials through its dependency injection system. It correctly mentions the use of `Depends` and provides a relevant example of checking an API key, which is directly supported by the context. Therefore, both the faithfulness and relevance scores are high."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context about how FastAPI manages shared database connections and authentication credentials through its dependency injection system. It correctly mentions the use of `Depends` and provides an example of checking an API key, which is directly supported by the context. The answer is clear, concise, and directly addresses the user's query without introducing any external information or assumptions."
     },
     {
       "id": "q8",
@@ -249,7 +249,7 @@
       "retries": 0,
       "cost_usd": 8.25e-05,
       "tokens_used": 541,
-      "latency_ms": 2552.2966384887695,
+      "latency_ms": 2685.6091022491455,
       "metrics": {
         "recall_1": 0.0,
         "recall_5": 0.0,
@@ -262,7 +262,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about headers-based authentication in FastAPI, the response is both faithful (as it does not fabricate information) and relevant (as it directly addresses the lack of context). Therefore, both scores are the highest possible."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information to draw from, the response is entirely faithful and relevant, as it accurately reflects the lack of context to answer the user's query."
     },
     {
       "id": "q9",
@@ -281,7 +281,7 @@
       "retries": 0,
       "cost_usd": 0.0003,
       "tokens_used": 1640,
-      "latency_ms": 4572.835922241211,
+      "latency_ms": 4467.027187347412,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -294,7 +294,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding how FastAPI handles CORS policies through CORSMiddleware. It does not introduce any external claims or details, making it fully grounded in the context. Additionally, the answer directly addresses the user's query about CORS policies in FastAPI, providing a clear and concise response."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding how FastAPI handles CORS policies. It directly cites the relevant section of the context, confirming that it is fully grounded and does not include any external claims or assumptions. Additionally, the answer is concise and directly addresses the user's query without any unnecessary details."
     },
     {
       "id": "q10",
@@ -309,7 +309,7 @@
       "retries": 0,
       "cost_usd": 7.44e-05,
       "tokens_used": 487,
-      "latency_ms": 6742.092847824097,
+      "latency_ms": 2734.769105911255,
       "metrics": {
         "recall_1": 0.0,
         "recall_5": 0.0,
@@ -322,7 +322,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the libraries FastAPI uses for routing and schema validation, the response is both faithful (as it accurately reflects the lack of information) and relevant (as it directly addresses the inability to provide an answer due to the context)."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the libraries FastAPI uses for routing and schema validation, the response is both faithful (as it accurately reflects the lack of context) and relevant (as it directly addresses the impossibility of answering the question due to the absence of information)."
     },
     {
       "id": "q11",
@@ -341,7 +341,7 @@
       "retries": 0,
       "cost_usd": 0.00029505,
       "tokens_used": 1646,
-      "latency_ms": 4484.501361846924,
+      "latency_ms": 4917.764663696289,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -373,7 +373,7 @@
       "retries": 0,
       "cost_usd": 0.00029144999999999996,
       "tokens_used": 1613,
-      "latency_ms": 4333.093881607056,
+      "latency_ms": 5236.447811126709,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -386,7 +386,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding the target chunk size and overlap used by the RAG system. It is fully supported by the context without introducing any external claims or details. Additionally, the answer directly addresses the user's query in a clear and concise manner."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding the target chunk size and overlap used by the RAG system. It directly cites the relevant context ID, confirming its grounding in the provided text. Additionally, the answer is concise and directly addresses the user's query without any extraneous information."
     },
     {
       "id": "q13",
@@ -400,12 +400,12 @@
         "99ebe920-740d-525f-b1e6-52ad55b3fe22"
       ],
       "gold_answer": "A Cross-Encoder is integrated to re-rank top retrieval hits because standard dense vector search lacks detailed keyword-document cross-attention.",
-      "generated_answer": "The benefits of integrating a Cross-Encoder model, such as `ms-marco-MiniLM-L-6-v2`, into a machine learning system include the ability to re-rank the top retrieval hits by processing the query and document text together. This integration yields log-odds scores that can be normalized to a [0.0, 1.0] range via a sigmoid function, which enhances the detailed keyword-document cross-attention compared to standard dense vector search [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
+      "generated_answer": "The benefits of integrating a Cross-Encoder model, such as `ms-marco-MiniLM-L-6-v2`, into a machine learning system include the ability to re-rank the top retrieval hits by processing the query and document text together. This integration yields log-odds scores that can be normalized to a [0.0, 1.0] range via a sigmoid function, which enhances the detail of keyword-document cross-attention compared to standard dense vector search [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00035654999999999997,
-      "tokens_used": 1813,
-      "latency_ms": 6412.2984409332275,
+      "cost_usd": 0.0003603,
+      "tokens_used": 1820,
+      "latency_ms": 5430.242300033569,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -414,11 +414,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.34146341463414637,
+        "f1_score": 0.3132530120481928,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer is fully supported by the context provided, specifically detailing the benefits of integrating a Cross-Encoder like `ms-marco-MiniLM-L-6-v2` as mentioned in the context. It accurately describes how the Cross-Encoder processes query and document text together to yield log-odds scores, which aligns perfectly with the information in the context. Additionally, the answer directly addresses the user's query without any extraneous information or assumptions, making it both faithful and relevant."
+      "judge_explanation": "The generated answer is fully supported by the context provided, specifically detailing the benefits of integrating a Cross-Encoder like `ms-marco-MiniLM-L-6-v2` as mentioned in the context. It accurately describes how the Cross-Encoder processes query and document text together to yield log-odds scores, which aligns perfectly with the information in the context. Additionally, the answer directly addresses the user's query without introducing any external claims or assumptions, making it both faithful and relevant."
     },
     {
       "id": "q14",
@@ -432,12 +432,12 @@
         "99ebe920-740d-525f-b1e6-52ad55b3fe22"
       ],
       "gold_answer": "Cross-Encoder log-odds scores are normalized to a [0.0, 1.0] range via a sigmoid function.",
-      "generated_answer": "You can normalize Cross-Encoder log-odds scores to a [0.0, 1.0] range via a sigmoid function [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
+      "generated_answer": "To normalize Cross-Encoder log-odds scores, you can use a sigmoid function to transform the scores to a [0.0, 1.0] range [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.000309,
-      "tokens_used": 1655,
-      "latency_ms": 4144.440174102783,
+      "cost_usd": 0.0003135,
+      "tokens_used": 1667,
+      "latency_ms": 4610.609292984009,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -446,11 +446,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.7096774193548386,
+        "f1_score": 0.5555555555555556,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding the normalization of Cross-Encoder log-odds scores using a sigmoid function. It does not introduce any external claims or details, making it fully grounded in the context. Additionally, the answer directly addresses the user's query without any vagueness or unnecessary information."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding the normalization of Cross-Encoder log-odds scores using a sigmoid function. It does not introduce any external claims or assumptions, and it directly addresses the user's query in a clear and concise manner."
     },
     {
       "id": "q15",
@@ -465,7 +465,7 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1578.9096355438232,
+      "latency_ms": 1809.6482753753662,
       "metrics": {
         "recall_1": 0.0,
         "recall_5": 0.0,
@@ -478,7 +478,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the maximum retry limit for the Critique Pass, the response is both faithful (as it does not fabricate information) and relevant (as it directly addresses the lack of information). Therefore, both scores are the highest possible."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the maximum retry limit for the Critique Pass, the response is both faithful (as it accurately reflects the lack of information) and relevant (as it directly addresses the inability to provide an answer due to the context)."
     },
     {
       "id": "q16",
@@ -491,7 +491,7 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1469.604253768921,
+      "latency_ms": 2332.920789718628,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -504,7 +504,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the president of France, the response is both faithful to the lack of context and relevant to the user's question."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty and does not contain any information about the president of France. Therefore, the answer is fully grounded in the context and directly addresses the user's query by indicating that there is not enough information to provide a response."
     },
     {
       "id": "q17",
@@ -517,7 +517,7 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1364.5753860473633,
+      "latency_ms": 1897.538661956787,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -530,7 +530,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the capital of Japan, the response is both faithful (as it does not fabricate information) and relevant (as it directly addresses the lack of context). Therefore, both scores are the highest possible."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the capital of Japan, the response is both faithful (as it does not fabricate information) and relevant (as it acknowledges the lack of context to provide an answer). Therefore, both scores are the highest possible."
     },
     {
       "id": "q18",
@@ -543,7 +543,7 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1421.1406707763672,
+      "latency_ms": 1774.5416164398193,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -556,7 +556,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the number of moons Mars has, the response is both faithful (as it does not fabricate information) and relevant (as it directly addresses the lack of context). Therefore, both scores are the highest possible."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the number of moons Mars has, the response is both faithful (as it accurately reflects the lack of information) and relevant (as it directly addresses the inability to provide an answer due to the absence of context)."
     }
   ]
 }

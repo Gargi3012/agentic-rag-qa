@@ -18,23 +18,33 @@ logger = logging.getLogger("agentic_rag.retrieval.qdrant")
 
 class QdrantStore:
     def __init__(self):
-        self.host = os.getenv("QDRANT_HOST", "localhost")
+        self.url = os.getenv("QDRANT_URL", "").strip()
+        self.host = os.getenv("QDRANT_HOST", "localhost").strip()
         self.port = int(os.getenv("QDRANT_PORT", "6333"))
-        self.api_key = os.getenv("QDRANT_API_KEY", "")
+        self.api_key = os.getenv("QDRANT_API_KEY", "").strip()
         self.collection_name = "agentic_rag_docs"
         
-        logger.info(f"Connecting to Qdrant at {self.host}:{self.port}...")
+        # Determine connection coordinates
+        if self.url:
+            connection_info = self.url
+        else:
+            connection_info = f"{self.host}:{self.port}"
+            
+        logger.info(f"Connecting to Qdrant at {connection_info}...")
         try:
-            # Short timeout to fail fast if server is down and trigger in-memory fallback
-            if self.api_key:
-                self.client = QdrantClient(host=self.host, port=self.port, api_key=self.api_key, timeout=2.0)
+            # Increase timeout slightly for cloud connections
+            timeout_sec = 5.0 if self.url else 2.0
+            
+            if self.url:
+                self.client = QdrantClient(url=self.url, api_key=self.api_key or None, timeout=timeout_sec)
             else:
-                self.client = QdrantClient(host=self.host, port=self.port, timeout=2.0)
+                self.client = QdrantClient(host=self.host, port=self.port, api_key=self.api_key or None, timeout=timeout_sec)
+                
             # Trigger request to check if server is active
             self.client.get_collections()
             logger.info("Successfully connected to Qdrant client.")
         except Exception as e:
-            logger.warning(f"Failed to connect to Qdrant server at {self.host}:{self.port}: {str(e)}")
+            logger.warning(f"Failed to connect to Qdrant server at {connection_info}: {str(e)}")
             logger.warning("Falling back to local in-memory Qdrant client (data will not persist).")
             try:
                 self.client = QdrantClient(":memory:")

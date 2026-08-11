@@ -13,7 +13,7 @@ This report summarizes the performance, retrieval quality, response quality, lat
 | | nDCG@5 | `0.7778` | Normalized Discounted Cumulative Gain ranking quality |
 | | Context Precision@5 | `0.7778` | Score of relevant chunks ordered correctly at top-5 |
 | **Generation** | Exact Match (EM) | `16.6667%` | Strict text match against reference gold answers |
-| | F1 Score | `0.5614` | Word-level token overlap score |
+| | F1 Score | `0.5515` | Word-level token overlap score |
 | **LLM-as-a-Judge** | Faithfulness | `5.00 / 5.00` | Groundedness of response based ONLY on context |
 | | Answer Relevance | `5.00 / 5.00` | How well the generated response answers the query |
 | **Telemetry** | Total Cost (USD) | `$0.003682` | Combined cost for OpenAI calls during run |
@@ -25,8 +25,8 @@ This report summarizes the performance, retrieval quality, response quality, lat
 
 | Pipeline Phase | p50 (Median) | p95 (95th Percentile) |
 | :--- | :---: | :---: |
-| **Retrieval Only** (Analysis + Hybrid Search) | `1521.87 ms` | `2502.32 ms` |
-| **Full Pipeline** (Retrieval + Rerank + Gen + Critic) | `4408.82 ms` | `7805.82 ms` |
+| **Retrieval Only** (Analysis + Hybrid Search) | `2248.07 ms` | `3223.78 ms` |
+| **Full Pipeline** (Retrieval + Rerank + Gen + Critic) | `4610.98 ms` | `6466.59 ms` |
 
 ---
 
