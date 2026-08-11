@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from openai import OpenAI
 import openai
 from app.config import Config
-from app.retrieval.qdrant_client import QdrantStore
+from app.retrieval import QdrantStore, rerank_chunks
 
 logger = logging.getLogger("agentic_rag.generation.agent")
 
@@ -127,3 +127,31 @@ class AgenticQueryPipeline:
             logger.error(f"Hybrid retrieval failed: {str(e)}")
             # If Qdrant search fails, return empty list (handled downstream by relevance gate)
             return []
+
+    def rerank_and_gate(self, query: str, chunks: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool]:
+        """
+        Step 3 & 4: Cross-Encoder Reranking & Relevance Gate
+        Reranks top-20 chunks using local Cross-Encoder.
+        If the highest score is below Config.RELEVANCE_THRESHOLD, triggers gate failure.
+        """
+        if not chunks:
+            logger.info("No chunks to rerank. Relevance gate failed.")
+            return [], False
+            
+        logger.info(f"Reranking {len(chunks)} chunks using Cross-Encoder...")
+        # Get top-5 reranked chunks
+        reranked = rerank_chunks(query, chunks, top_k=5)
+        
+        if not reranked:
+            logger.info("Rerank returned no documents. Relevance gate failed.")
+            return [], False
+            
+        best_score = reranked[0]["rerank_score"]
+        logger.info(f"Reranked top chunk score: {best_score:.4f} (Threshold: {Config.RELEVANCE_THRESHOLD})")
+        
+        if best_score < Config.RELEVANCE_THRESHOLD:
+            logger.warning(f"Best score {best_score:.4f} is below relevance threshold {Config.RELEVANCE_THRESHOLD}. Gate failed.")
+            return [], False
+            
+        logger.info(f"Relevance gate passed. Proceeding with {len(reranked)} chunks.")
+        return reranked, True
