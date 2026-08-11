@@ -45,6 +45,18 @@ class QdrantStore:
             logger.info("Successfully connected to Qdrant client.")
         except Exception as e:
             logger.warning(f"Failed to connect to Qdrant server at {connection_info}: {str(e)}")
+            
+            # Docker Compose DNS fallback: if host is localhost, try "qdrant" service name
+            if not self.url and self.host == "localhost":
+                logger.info("Attempting Docker-Compose DNS fallback (host='qdrant')...")
+                try:
+                    self.client = QdrantClient(host="qdrant", port=self.port, api_key=self.api_key or None, timeout=2.0)
+                    self.client.get_collections()
+                    logger.info("Successfully connected to Qdrant Docker service.")
+                    return
+                except Exception as docker_e:
+                    logger.warning(f"Docker DNS fallback failed: {str(docker_e)}")
+            
             logger.warning("Falling back to local in-memory Qdrant client (data will not persist).")
             try:
                 self.client = QdrantClient(":memory:")
