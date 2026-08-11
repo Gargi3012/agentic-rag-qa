@@ -1,0 +1,24 @@
+# Core API & Web Server
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
+
+# Vector DB & Embeddings
+qdrant-client>=1.9.0
+fastembed>=0.2.7
+sentence-transformers>=2.7.0
+
+# LLM Integration
+openai>=1.20.0
+tiktoken>=0.6.0
+
+# Document Processing
+pypdf>=4.2.0
+pymupdf>=1.24.2
+beautifulsoup4>=4.12.3
+markdown>=3.6
+
+# Utilities
+python-dotenv>=1.0.1
+pydantic>=2.7.1
+requests>=2.31.0
