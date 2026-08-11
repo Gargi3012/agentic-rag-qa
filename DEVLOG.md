@@ -74,6 +74,32 @@ This log is an iterative engineering diary tracking the design decisions, implem
 
 ---
 
+## 🧠 Phase 4: Agentic Query Pipeline with Self-Correction and No-Hallucination Gate
+
+### What Was Built
+- **Query Analyzer (`app/generation/agent.py`)**: Utilized OpenAI's structured outputs (`beta.chat.completions.parse` with Pydantic) to evaluate if query expansion/reformulation is needed, capped at 1 rewrite.
+- **Cross-Encoder Reranker (`app/retrieval/reranker.py`)**: Integrated local `cross-encoder/ms-marco-MiniLM-L-6-v2` to score relevance. Normalized log-odds using a sigmoid function to map them to `[0.0, 1.0]`.
+- **Relevance Gate**: Implemented a gate checking the best rerank score against `RELEVANCE_THRESHOLD`. If it fails, the system immediately returns `"insufficient context"` without executing LLM generation, saving LLM API costs.
+- **Contextual Compressor**: Developed a lightweight sentence-level keyword overlap filters to extract only the most relevant sentences in retrieved chunks, significantly reducing prompt token overhead.
+- **Grounded Generator**: Prompts OpenAI `gpt-4o-mini` with strict rules to only answer from context and inject explicit source citations like `[cite: chunk_id]`.
+- **LLM Critic Pass & Retry**: Evaluates answer groundedness via a cheap LLM call. If any statement is ungrounded or citations are missing, it triggers 1 strict retry. It returns low-confidence flags if the retry also fails.
+
+### Design Decisions & Rationale
+- **Structured Pydantic Analysis**: Leveraged Pydantic-based JSON schema validation for both the Query Analyzer and the Critic checks. This guarantees that LLM outputs conform to our type annotations, preventing runtime parsing exceptions.
+- **Sigmoid Score Normalization**: Wrapped the unnormalized log-odds of the Cross-Encoder model in a Sigmoid function to map scores to `[0, 1]`. This makes configuring a score threshold (e.g. `0.35` in `.env`) intuitive and robust.
+- **Overlap-Based Sentence Compression**: Chose a local overlap-based regex sentence ranker to compress context before generation. This avoids adding a third LLM call for compression, saving API latency and token cost.
+- **Unanswerable Refusal Guard**: Short-circuits the pipeline immediately on gate failure, preventing hallucinations and saving 100% of LLM generation costs for out-of-bounds questions.
+
+### Challenges Encountered & Debugging
+- **Type Hint Name Resolution Order**: Moving `CriticCheck` definition below the `AgenticQueryPipeline` class created a compiler-time `NameError: name 'CriticCheck' is not defined`. Relocated the Pydantic classes to the top of the module to resolve import compile failures.
+- **Class Indentation Scope Premature Closure**: Declared the module-level function `compress_context` directly under the class, which prematurely closed the class scope, causing subsequent methods to not be bound to the class instance (AttributeError). Reorganized the module layout by moving all standalone functions to the top of the file, keeping class methods contiguous.
+
+### Assumptions Made
+- Assumed `gpt-4o-mini` is highly compliant with structured parsing formats.
+- Assumed Madagascar chocolate chips are indeed the cookie secret ingredient for our local test script verification.
+
+---
+
 ## 📝 Candidate Reflection & Reflection Placeholders
 *(Note: As required by the submission guidelines, the final candidate reflections must be written manually by the candidate).*
 

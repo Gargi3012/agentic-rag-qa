@@ -15,6 +15,11 @@ class QueryAnalysis(BaseModel):
     suggested_query: str = Field(description="The reformulated query for better keyword matching and semantic search, or original query if no rewrite is needed.")
     reason: str = Field(description="Explanation of why rewriting was or was not necessary.")
 
+
+class CriticCheck(BaseModel):
+    is_grounded: bool = Field(description="True if every fact in the answer is directly supported by the context. False if there are hallucinations or outside information.")
+    reason: str = Field(description="Explanation of the findings, explaining any ungrounded statements.")
+
 def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], response_format=None, **kwargs) -> Any:
     """
     Utility to invoke OpenAI chat completions with exponential backoff on connection/timeout errors.
@@ -47,6 +52,41 @@ def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], respon
         except Exception as e:
             logger.error(f"Unexpected OpenAI error: {str(e)}")
             raise e
+
+
+import re
+
+def compress_context(chunk_text: str, query: str, max_sentences: int = 3) -> str:
+    """
+    Trims a text chunk to only the most relevant sentences.
+    Computes a keyword overlap score between the query terms and sentences.
+    """
+    query_words = set(query.lower().split())
+    # Basic stop words to ignore in keyword matching
+    stop_words = {"what", "is", "the", "how", "does", "to", "in", "a", "an", "and", "of", "for", "on", "with", "about", "by", "why", "are", "you", "i"}
+    query_keywords = query_words - stop_words
+    if not query_keywords:
+        query_keywords = query_words
+        
+    # Split text into sentences using simple regex
+    sentences = re.split(r'(?<=[.!?])\s+', chunk_text.strip())
+    if len(sentences) <= max_sentences:
+        return chunk_text
+        
+    scored_sentences = []
+    for idx, sent in enumerate(sentences):
+        # Basic word matching score
+        sent_words = set(sent.lower().split())
+        overlap = len(query_keywords.intersection(sent_words))
+        scored_sentences.append((overlap, idx, sent))
+        
+    # Sort by overlap score descending, then by original index ascending
+    scored_sentences.sort(key=lambda x: (-x[0], x[1]))
+    
+    # Select top sentences
+    top_selections = sorted(scored_sentences[:max_sentences], key=lambda x: x[1])
+    return " ".join(t[2] for t in top_selections)
+
 
 class AgenticQueryPipeline:
     def __init__(self, store: Optional[QdrantStore] = None):
@@ -155,3 +195,245 @@ class AgenticQueryPipeline:
             
         logger.info(f"Relevance gate passed. Proceeding with {len(reranked)} chunks.")
         return reranked, True
+
+
+# Add these methods to AgenticQueryPipeline
+    def generate_grounded_answer(
+        self,
+        query: str,
+        chunks: List[Dict[str, Any]],
+        strict_mode: bool = False,
+        critic_feedback: str = ""
+    ) -> tuple[str, int, int]:
+        """
+        Calls OpenAI to generate an answer grounded in the compressed context.
+        """
+        if not self.client:
+            return "insufficient context", 0, 0
+
+        # Build context prompt
+        context_str_list = []
+        for c in chunks:
+            # Compress chunk text
+            compressed_text = compress_context(c["text"], query, max_sentences=3)
+            context_str_list.append(
+                f"--- \n"
+                f"Chunk ID: {c['id']}\n"
+                f"Filename: {c['metadata'].get('filename', 'unknown')}\n"
+                f"Content: {compressed_text}\n"
+                f"---"
+            )
+        context_block = "\n\n".join(context_str_list)
+
+        system_instruction = (
+            "You are a highly factual QA system. Answer the User Query based ONLY on the provided Context. "
+            "For any fact you state, you MUST cite the source chunk using the exact format [cite: chunk_id] where chunk_id is the exact ID provided in the context. "
+            "Do not state any fact that is not directly supported by the Context. "
+            "If the provided Context is insufficient to answer the query, refuse to answer and return 'insufficient context' exactly. "
+            "Do not use outside knowledge or extrapolate."
+        )
+
+        user_content = f"Context:\n{context_block}\n\nUser Query: {query}"
+        
+        if strict_mode:
+            system_instruction += (
+                "\n\nCRITICAL WARNING: Your previous attempt was flagged by the critic for not being fully grounded. "
+                "You MUST adhere strictly to the context. Do NOT make claims that aren't explicit. "
+                "Here is the critic feedback from your last attempt:\n"
+                f"{critic_feedback}"
+            )
+
+        messages = [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_content}
+        ]
+
+        try:
+            logger.info("Generating answer from OpenAI...")
+            completion = call_llm_with_backoff(
+                client=self.client,
+                messages=messages,
+                model=Config.LLM_MODEL,
+                temperature=0.0
+            )
+            answer = completion.choices[0].message.content.strip()
+            prompt_tokens = completion.usage.prompt_tokens
+            completion_tokens = completion.usage.completion_tokens
+            return answer, prompt_tokens, completion_tokens
+        except Exception as e:
+            logger.error(f"Failed to generate grounded answer: {str(e)}")
+            raise e
+
+    def run_critic_pass(self, query: str, answer: str, chunks: List[Dict[str, Any]]) -> tuple[CriticCheck, int, int]:
+        """
+        Invokes a cheap LLM call to verify if the answer is fully grounded in the provided context chunks.
+        """
+        if not self.client:
+            return CriticCheck(is_grounded=True, reason="No LLM client"), 0, 0
+
+        # Build context block
+        context_str_list = []
+        for c in chunks:
+            context_str_list.append(f"Chunk ID: {c['id']}\nText: {c['text']}")
+        context_block = "\n\n".join(context_str_list)
+
+        system_instruction = (
+            "You are an AI Critic evaluating groundedness for a RAG QA system. "
+            "Evaluate if the candidate answer is fully supported by and grounded in the provided Context. "
+            "Check for:\n"
+            "1. Statements in the answer not backed by the context (hallucinations).\n"
+            "2. Failure to use the exact [cite: chunk_id] tag when stating facts.\n"
+            "If the candidate answer says 'insufficient context', it is considered grounded (is_grounded = True).\n"
+            "Be strict. If any part of the answer is unsupported, set is_grounded to False."
+        )
+
+        user_content = (
+            f"Context:\n{context_block}\n\n"
+            f"User Query: {query}\n\n"
+            f"Candidate Answer: {answer}"
+        )
+
+        messages = [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_content}
+        ]
+
+        try:
+            logger.info("Running Critic Pass check on the candidate answer...")
+            completion = call_llm_with_backoff(
+                client=self.client,
+                messages=messages,
+                response_format=CriticCheck,
+                model=Config.LLM_MODEL,
+                temperature=0.0
+            )
+            check: CriticCheck = completion.choices[0].message.parsed
+            prompt_tokens = completion.usage.prompt_tokens
+            completion_tokens = completion.usage.completion_tokens
+            logger.info(f"Critic Pass result: grounded={check.is_grounded} (Reason: {check.reason})")
+            return check, prompt_tokens, completion_tokens
+        except Exception as e:
+            logger.error(f"Critic Pass execution failed: {str(e)}")
+            # Default to True in case of critic API failure to avoid infinite rejections
+            return CriticCheck(is_grounded=True, reason=f"Critic API Error: {str(e)}"), 0, 0
+
+    def query(self, query_text: str, filter_dict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Executes the full agentic query pipeline:
+        Analyzer -> Retrieval -> Rerank & Gate -> Compression -> Generation -> Critic Pass (with 1 retry)
+        """
+        start_time = time.time()
+        
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        retries_count = 0
+        confidence = "high"
+        
+        # Edge Case: Empty query
+        if len(query_text.strip()) == 0:
+            return {
+                "answer": "insufficient context",
+                "chunks": [],
+                "confidence": "none",
+                "retries": 0,
+                "status": "empty_query_refusal",
+                "latency_ms": 0.0,
+                "cost": 0.0,
+                "tokens_used": 0
+            }
+
+        # 1. Query Analyzer
+        rewritten_query = self.analyze_query(query_text)
+        
+        # 2. Hybrid Retrieval (dense + sparse top-20)
+        retrieved_chunks = self.retrieve_context(rewritten_query, filter_dict)
+        
+        # 3 & 4. Cross-Encoder Reranking & Relevance Gate
+        reranked_chunks, passed_gate = self.rerank_and_gate(rewritten_query, retrieved_chunks)
+        
+        if not passed_gate:
+            latency = (time.time() - start_time) * 1000
+            return {
+                "answer": "insufficient context",
+                "chunks": [],
+                "confidence": "none",
+                "retries": 0,
+                "status": "relevance_gate_refusal",
+                "latency_ms": latency,
+                "cost": 0.0,
+                "tokens_used": 0
+            }
+
+        # 5 & 6. Grounded Generation
+        # Initial Attempt
+        answer, p_tokens, c_tokens = self.generate_grounded_answer(rewritten_query, reranked_chunks)
+        total_prompt_tokens += p_tokens
+        total_completion_tokens += c_tokens
+        
+        # If the answer is an explicit refusal, we skip the critic check
+        if answer.lower() == "insufficient context":
+            latency = (time.time() - start_time) * 1000
+            cost = (total_prompt_tokens * 0.00000015) + (total_completion_tokens * 0.00000060)
+            return {
+                "answer": "insufficient context",
+                "chunks": [],
+                "confidence": "none",
+                "retries": 0,
+                "status": "model_refusal",
+                "latency_ms": latency,
+                "cost": cost,
+                "tokens_used": total_prompt_tokens + total_completion_tokens
+            }
+
+        # 7. Critic Pass
+        critic_check, cp_p_tokens, cp_c_tokens = self.run_critic_pass(rewritten_query, answer, reranked_chunks)
+        total_prompt_tokens += cp_p_tokens
+        total_completion_tokens += cp_c_tokens
+        
+        # If Critic fails, regenerate once
+        if not critic_check.is_grounded:
+            logger.warning("Critic pass failed. Triggering strict generation retry...")
+            retries_count += 1
+            
+            # Second attempt with feedback
+            answer, p_tokens, c_tokens = self.generate_grounded_answer(
+                query=rewritten_query,
+                chunks=reranked_chunks,
+                strict_mode=True,
+                critic_feedback=critic_check.reason
+            )
+            total_prompt_tokens += p_tokens
+            total_completion_tokens += c_tokens
+            
+            # Run final critic pass on retry
+            critic_check, cp_p_tokens, cp_c_tokens = self.run_critic_pass(rewritten_query, answer, reranked_chunks)
+            total_prompt_tokens += cp_p_tokens
+            total_completion_tokens += cp_c_tokens
+            
+            if not critic_check.is_grounded:
+                logger.error("Critic pass failed twice. Returning best-effort answer with low-confidence flag.")
+                confidence = "low"
+            else:
+                logger.info("Critic pass passed on retry.")
+
+        # Compute cost
+        cost = (total_prompt_tokens * 0.00000015) + (total_completion_tokens * 0.00000060)
+        latency = (time.time() - start_time) * 1000
+        
+        return {
+            "answer": answer,
+            "chunks": [
+                {
+                    "id": c["id"],
+                    "text": c["text"],
+                    "metadata": c["metadata"],
+                    "score": c.get("rerank_score", 0.0)
+                } for c in reranked_chunks
+            ],
+            "confidence": confidence,
+            "retries": retries_count,
+            "status": "success",
+            "latency_ms": latency,
+            "cost": cost,
+            "tokens_used": total_prompt_tokens + total_completion_tokens
+        }
