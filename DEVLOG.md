@@ -50,6 +50,30 @@ This log is an iterative engineering diary tracking the design decisions, implem
 
 ---
 
+## 💾 Phase 3: Embedding & Qdrant Vector Storage
+
+### What Was Built
+- **Dense Embedding Generator (`app/retrieval/dense_embed.py`)**: Integrated local HuggingFace `all-MiniLM-L6-v2` SentenceTransformer for generating 384-dimensional dense vectors at zero API cost. Implemented model caching via a singleton structure.
+- **Sparse Embedding Generator (`app/retrieval/sparse_embed.py`)**: Set up local FastEmbed `Qdrant/bm25` for sparse keyword index generation (indices and weights) to enable hybrid search without external API dependencies.
+- **Qdrant Storage Wrapper (`app/retrieval/qdrant_client.py`)**: Built collection configuration with dual-vector support (dense + sparse). Developed batch search using Qdrant's server-side Reciprocal Rank Fusion (RRF).
+- **Cost-Optimized Idempotency checks**: Configured the upsert pipeline to query Qdrant for existing chunk IDs first, allowing us to only embed and upsert new chunks. This completely eliminates unnecessary vector embedding generation.
+- **Portability Fallbacks**: Configured automatic fallback to in-memory `QdrantClient(":memory:")` if connection to a Docker-hosted database fails, ensuring the code works without Docker configuration on target developer environments.
+
+### Design Decisions & Rationale
+- **Zero-Cost Local Retrieval**: Opted to run dense (MiniLM) and sparse (BM25) vector generation locally. This prevents external API latency and keeps index building costs strictly at zero.
+- **Server-Side Reciprocal Rank Fusion**: Utilized Qdrant's native `query_points` with prefetch and FusionQuery RRF. This delegates the ranking and merging calculations to the database engine rather than fetching all hits and processing ranking manually in python.
+- **Retrieve-Before-Embed Guard**: Queries Qdrant by point IDs (which are deterministic hashes of text+path) before generating embeddings. If a point is present, it is omitted from the batch passed to HuggingFace/FastEmbed.
+
+### Challenges Encountered & Debugging
+- **Docker Command Availability**: Discovered Docker CLI was not registered on the system environment path, causing the test environment verification to fail. Designed and implemented the in-memory `:memory:` fallback which successfully bypassed local environment restrictions.
+- **Compatability Warnings**: Resolved initial cache filesystem warnings on Windows systems (regarding symlink creation) by verifying that files cache correctly in temporary storage without failing execution.
+
+### Assumptions Made
+- Assumed standard cosine similarity is the appropriate distance metric for SentenceTransformer outputs.
+- Assumed in-memory mode is sufficient for local development/testing; in-memory indexes behave identically to the dockerized Qdrant API.
+
+---
+
 ## 📝 Candidate Reflection & Reflection Placeholders
 *(Note: As required by the submission guidelines, the final candidate reflections must be written manually by the candidate).*
 
