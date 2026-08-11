@@ -28,6 +28,28 @@ This log is an iterative engineering diary tracking the design decisions, implem
 
 ---
 
+## 📦 Phase 2: Ingestion Pipeline with Idempotent Chunking
+
+### What Was Built
+- **Document Loaders (`app/ingestion/loader.py`)**: Implemented parsing and content extraction for PDF, HTML, and Markdown. Integrates PyMuPDF (fitz) for rapid text extraction, and BeautifulSoup for cleaning HTML page bodies.
+- **Recursive Chunker (`app/ingestion/chunker.py`)**: Built a custom recursive text splitter measuring chunk length in token counts via `tiktoken`. Auto-splits any chunk exceeding token limits to guarantee safety before embedding.
+- **Deduplicator (`app/ingestion/dedup.py`)**: Created deterministic UUID generation utilizing SHA-256 content hashes + file paths. This ensures exact file-level idempotency and prevents duplicate database upserts.
+- **Integration Tests**: Tested the ingestion pipeline using a local scratch script with mock data.
+
+### Design Decisions & Rationale
+- **Deterministic Point UUIDs**: Derived UUIDv5 from SHA-256 content hashes of each chunk combined with its relative file path. This guarantees that re-ingesting the same file generates identical vector IDs, meaning Qdrant will overwrite existing nodes instead of accumulating duplicates.
+- **PyMuPDF for PDF Processing**: Selected PyMuPDF (`fitz`) over `pypdf` because it is significantly faster and cleaner for extracting text from layouts, while including graceful exception handling for scanned/empty PDFs to avoid pipeline failures.
+
+### Challenges Encountered & Debugging
+- **Import Resolution Order (NameError)**: Experienced a `NameError: name 'BaseModel' is not defined` due to using `BaseModel` for the `Chunk` class definition prior to its import declaration. Re-organized the imports at the top of `chunker.py` and resolved the compiler error.
+- **Virtual Environment Dependency Paths**: Local testing failed initially due to missing packages in the global interpreter. Configured a local `.venv` and executed the test runner within the virtual environment successfully.
+
+### Assumptions Made
+- Assumed standard documents have readable text; scanned PDFs will trigger warning flags and will be skipped cleanly.
+- Assumed `cl100k_base` tokenizer encoding is a sufficient baseline proxy for token calculations for both our dense embeddings and the OpenAI generation models.
+
+---
+
 ## 📝 Candidate Reflection & Reflection Placeholders
 *(Note: As required by the submission guidelines, the final candidate reflections must be written manually by the candidate).*
 
