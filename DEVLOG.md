@@ -100,6 +100,33 @@ This log is an iterative engineering diary tracking the design decisions, implem
 
 ---
 
+## 🔒 Phase 5: API Key Auth, Rate Limiting, and Structured Logging
+
+### What Was Built
+- **API Header Authentication (`app/api/auth.py`)**: Implemented simple headers-based verification checking `X-API-Key` matches the secret `APP_API_KEY` defined in the environment.
+- **Sliding-Window Rate Limiter (`app/api/rate_limiter.py`)**: Built an in-memory sliding window rate limiter per API key. Rejects traffic with HTTP 429 once request counts exceed the configured RPM limit (requests per minute) within any 60-second window.
+- **Structured JSON Logging (`app/api/logging.py`)**: Configured a custom structured JSON logger formatting queries and attaching exact telemetry metadata (latency, tokens, cost, retries, confidence, status).
+- **FastAPI Endpoints (`app/api/main.py`)**:
+  - `POST /ingest`: Directory loading, chunking, dedup, and indexing in one transactional call.
+  - `POST /query`: Pipeline orchestrator running through analyzer, retriever, reranker, relevance gate, compressed generator, and critic pass.
+  - `GET /health`: Diagnoses API server status, uptime, and database connection state.
+  - `GET /metrics`: Aggregates and returns telemetry history, success percentages, and total costs.
+
+### Design Decisions & Rationale
+- **FastAPI Dependencies for Security**: Used FastAPI's `Security` dependency injection framework to chain API Key authentication and Rate Limiting. This isolates endpoint authorization logic cleanly from endpoint route execution.
+- **Thread-Locked Sliding Windows**: Used Python's `threading.Lock` to synchronize rate-limiter updates. This guarantees that concurrent traffic checks on the same key don't create race conditions or incorrect count bypasses.
+- **Aggregated Performance Metrics**: Tracked and cached recent query telemetry and running aggregates (tokens, cost, average latency) in-memory using an thread-safe tracking model. This prevents database fetch overhead during monitoring queries.
+
+### Challenges Encountered & Debugging
+- **Uvicorn Port Conflicts / Test Client Strategy**: Initial local testing using live port binding was prone to port-in-use errors. Switched to `fastapi.testclient.TestClient` for unit and integration verification, which performs in-process HTTP mocking, bypassing OS port binds and speeding up testing.
+- **Deprecation Warnings**: Handled `StarletteDeprecationWarning` regarding Starlette `TestClient` and `fitz` API deprecation logs by verifying compatibility configurations.
+
+### Assumptions Made
+- Assumed memory footprints of sliding-window rate limiters and log history (capped at 50 queries) are negligible for typical API usage profiles.
+- Assumed standard client callers are capable of setting HTTP header properties (`X-API-Key`).
+
+---
+
 ## 📝 Candidate Reflection & Reflection Placeholders
 *(Note: As required by the submission guidelines, the final candidate reflections must be written manually by the candidate).*
 
