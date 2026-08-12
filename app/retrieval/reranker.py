@@ -1,5 +1,6 @@
 import logging
 import math
+import gc
 from typing import List, Dict, Any
 from sentence_transformers import CrossEncoder
 
@@ -47,8 +48,9 @@ def rerank_chunks(query: str, chunks: List[Dict[str, Any]], top_k: int = 5) -> L
         # Prepare pairs: [query, document_text]
         pairs = [[query, chunk["text"]] for chunk in chunks]
         
-        # Compute raw log-odds scores
-        raw_scores = reranker.predict(pairs)
+        # Compute raw log-odds scores in small batches to save memory
+        raw_scores = reranker.predict(pairs, batch_size=8, show_progress_bar=False)
+        gc.collect()
         
         # Apply sigmoid normalization and store scores
         for idx, score in enumerate(raw_scores):
