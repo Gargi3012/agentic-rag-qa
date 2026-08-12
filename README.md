@@ -1,7 +1,10 @@
 # Cost-Efficient Agentic RAG QA Service
 
+> 🚀 **Live Demo & API**: [https://agentic-rag-qa-production.up.railway.app](https://agentic-rag-qa-production.up.railway.app)
+
 This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant, and **Groq (llama-3.1-8b-instant)**. 
 
+- **Live URL**: `https://agentic-rag-qa-production.up.railway.app`
 - **Vector Store Chosen**: **Qdrant** (Self-hosted via Docker / Qdrant Cloud).
 - **One-line Why**: Selected Qdrant because it natively supports both dense vectors and FastEmbed sparse BM25 vectors, permitting server-side Reciprocal Rank Fusion (RRF) in a single high-performance API query.
 
