@@ -216,3 +216,33 @@ To break the coincidentally identical retrieval metric scores (all showing `0.88
 
 ### 📐 Design Decisions & Rationale
 - **Hard Negatives**: Introduced mixed-topic search queries (crossing technical terms with basketball or pasta recipes) and hard negative files (e.g. tracking players on a court using vectors or printing pasta recipes using Gutenberg's press). This forced realistic ranking competition, successfully generating differentiated retrieval metrics (Recall@5 = `0.9412`, MRR = `0.9118`, nDCG@5 = `0.9255`, Context Precision@5 = `0.9199`).
+
+---
+
+## 🖥️ Milestone 9: Groundwork UI, Groq Migration & PDF Fallback
+**Date**: August 12, 2026
+
+### 📋 Overview & Component Map
+
+| Component / File | Status | Description |
+| :--- | :---: | :--- |
+| [app/api/frontend.html](file:///d:/agentic_rag/app/api/frontend.html) | `NEW` | Single-page Groundwork UI — drag-and-drop file upload, live health indicator, answer feed with citation pills and confidence ring. |
+| [app/api/frontend_html.py](file:///d:/agentic_rag/app/api/frontend_html.py) | `MODIFY` | Replaced broken triple-quoted Python string (caused SyntaxError from JS backtick template literals) with a clean `get_frontend_html()` file-reader. |
+| [app/generation/agent.py](file:///d:/agentic_rag/app/generation/agent.py) | `MODIFY` | Migrated primary LLM from OpenAI `gpt-4o-mini` → **Groq `llama-3.1-8b-instant`**. Fixed critical early-return bug bypassing Groq fallback. Added `_groq_style_structured_call()` using `json_object` mode (Groq doesn't support `json_schema` for this model). |
+| [app/ingestion/loader.py](file:///d:/agentic_rag/app/ingestion/loader.py) | `MODIFY` | Added `pdfplumber` as a two-stage PDF fallback: PyMuPDF runs first; if it returns empty text (scanned/image PDFs), pdfplumber retries with a different extraction engine. |
+| [requirements.txt](file:///d:/agentic_rag/requirements.txt) | `MODIFY` | Added `pdfplumber>=0.11.0`. |
+
+### 📐 Design Decisions & Rationale
+
+- **HTML as a static file (not a Python string)**: The frontend HTML contains JavaScript template literals (backticks) which caused Python's triple-quoted string parser to throw a `SyntaxError: unterminated triple-quoted string literal`. Solution: saved HTML to `frontend.html` and read it at runtime via `open()`. No escaping needed.
+- **Groq as primary LLM**: OpenAI API key was expired/invalid. Groq provides an OpenAI-compatible REST API with `llama-3.1-8b-instant` — a fast, free-tier model. The entire `OpenAI()` client instantiation was repointed to `base_url="https://api.groq.com/openai/v1"`. Zero code changes needed in call sites.
+- **`json_object` mode over `json_schema`**: Groq's `llama-3.1-8b-instant` doesn't support OpenAI's `beta.chat.completions.parse` / `json_schema` response format. Replaced with `response_format={"type": "json_object"}` + manual `model_validate(json.loads(...))`. Wrapped result in a `MockCompletion` object to keep all downstream call-sites unchanged.
+- **Relevance threshold set to `0.001`**: Cross-encoder sigmoid-normalized scores for relevant content fall in the `0.0001–0.001` range (raw scores around `-7` to `-10`). The original threshold of `0.35` was designed for linear scores, not sigmoid-mapped ones, causing all queries to be gate-rejected. `0.001` correctly separates relevant from irrelevant content.
+- **Two-stage PDF extraction**: PyMuPDF is fast and accurate for text-layer PDFs. pdfplumber uses a different rendering engine (`pdfminer.six` + `pypdfium2`) that handles some encoding variants PyMuPDF misses. Truly image-only/scanned PDFs still return `None` (OCR not included).
+
+### 🐛 Challenges & Debugging Chronicles
+- **SyntaxError on frontend_html.py**: JS backtick template literals inside Python triple-quoted strings caused a parse error. Resolved by externalizing the HTML to a `.html` file.
+- **Groq `json_schema` 400 error**: `llama-3.1-8b-instant` rejects structured-output requests using `json_schema` mode. Solved by implementing `_groq_style_structured_call()` using `json_object` mode with manual Pydantic validation.
+- **All queries returning "insufficient context"**: Root cause was twofold — (1) OpenAI client was `None` causing early return before Groq fallback, and (2) relevance threshold `0.35` was incompatible with sigmoid-normalized scores. Fixed both.
+- **Empty PDF chunks in Qdrant**: Scanned resume PDF produced empty text → empty chunks stored with unknown source. Manually deleted via Qdrant `scroll()` + `delete()` by point ID.
+

@@ -5,6 +5,11 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 import pymupdf
+try:
+    import pdfplumber as _pdfplumber
+    _HAS_PDFPLUMBER = True
+except ImportError:
+    _HAS_PDFPLUMBER = False
 
 logger = logging.getLogger("agentic_rag.ingestion.loader")
 
@@ -12,28 +17,62 @@ class Document(BaseModel):
     text: str
     metadata: Dict[str, Any]
 
+def _extract_with_pdfplumber(file_path: str) -> Optional[str]:
+    """Fallback: extract text using pdfplumber (handles more PDF variants)."""
+    if not _HAS_PDFPLUMBER:
+        return None
+    try:
+        with _pdfplumber.open(file_path) as pdf:
+            pages_text = []
+            for page in pdf.pages:
+                t = page.extract_text()
+                if t:
+                    pages_text.append(t)
+        text = "\n".join(pages_text).strip()
+        return text if text else None
+    except Exception as e:
+        logger.warning(f"pdfplumber also failed for {file_path}: {e}")
+        return None
+
+
 def extract_pdf_text(file_path: str) -> Optional[str]:
     """
-    Extracts text from a PDF file using PyMuPDF (fitz).
-    Logs a warning and skips scanned/non-extractable PDFs.
+    Extracts text from a PDF file.
+    Strategy:
+      1. PyMuPDF (fitz) — fast, accurate for text-based PDFs.
+      2. pdfplumber fallback — handles more encoding variants and some
+         digitally-created PDFs that PyMuPDF misses.
+    Scanned/image-only PDFs will still return None (OCR not included).
     """
     try:
         doc = pymupdf.open(file_path)
         text_content = []
-        for page_num, page in enumerate(doc):
+        for page in doc:
             text = page.get_text()
             if text:
                 text_content.append(text)
-        
         full_text = "\n".join(text_content).strip()
-        if not full_text:
-            logger.warning(f"Scanned or non-extractable PDF detected: {file_path}. Skipping.")
-            return None
-        
-        return full_text
     except Exception as e:
-        logger.error(f"Error reading PDF file {file_path}: {str(e)}")
-        raise e
+        logger.error(f"PyMuPDF failed for {file_path}: {e}")
+        full_text = ""
+
+    if full_text:
+        return full_text
+
+    # --- Fallback: pdfplumber ---
+    logger.warning(
+        f"PyMuPDF returned no text for {file_path}. Trying pdfplumber fallback..."
+    )
+    fallback = _extract_with_pdfplumber(file_path)
+    if fallback:
+        logger.info(f"pdfplumber successfully extracted text from {file_path}")
+        return fallback
+
+    logger.warning(
+        f"Both extractors returned no text for {file_path}. "
+        "PDF is likely image/scanned-only. Skipping."
+    )
+    return None
 
 def extract_html_text(file_path: str) -> str:
     """

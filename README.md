@@ -1,6 +1,6 @@
 # Cost-Efficient Agentic RAG QA Service
 
-This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant, and OpenAI `gpt-4o-mini`. 
+This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant, and **Groq (llama-3.1-8b-instant)**. 
 
 - **Vector Store Chosen**: **Qdrant** (Self-hosted via Docker / Qdrant Cloud).
 - **One-line Why**: Selected Qdrant because it natively supports both dense vectors and FastEmbed sparse BM25 vectors, permitting server-side Reciprocal Rank Fusion (RRF) in a single high-performance API query.
@@ -20,7 +20,7 @@ Retrieval embedding cost is kept strictly at **$0.00** by generating dense embed
                           │
                 [Cross-Encoder Rerank] (ms-marco-MiniLM-L-6-v2)
                           │
-                  [Relevance Gate]  (Sigmoid score threshold check: 0.35)
+                  [Relevance Gate]  (Sigmoid score threshold check: 0.001)
                          / \
                         /   \
                  (Passed)   (Failed) ──> [Refusal: insufficient context]
@@ -28,9 +28,9 @@ Retrieval embedding cost is kept strictly at **$0.00** by generating dense embed
                      /
            [Context Compressor]     (Sentence-level keyword overlap compression)
                     │
-           [Grounded Generator]     (gpt-4o-mini with source [cite: chunk_id])
+           [Grounded Generator]     (Groq llama-3.1-8b-instant with source [cite: chunk_id])
                     │
-              [Critic Pass]         (gpt-4o-mini structured grounding check)
+              [Critic Pass]         (Groq llama-3.1-8b-instant structured grounding check)
                      / \
                     /   \
                  (Pass) (Fail) ───> [Regenerate with feedback (Max 1 retry)]
@@ -246,7 +246,7 @@ To keep embedding costs at **$0.00**, we utilize local models:
 *Trade-off*: Local models have slightly lower recall compared to paid commercial embeddings (e.g. OpenAI's `text-embedding-3-large`). We mitigate this by utilizing local Cross-Encoder reranking to ensure high relevance of the top-5 chunks before generation.
 
 ### 3. No-Hallucination Gate & Gating Loops
-- **Relevance Gate**: The top-20 retrieved chunks are scored using `ms-marco-MiniLM-L-6-v2`. Raw scores are normalized to `[0.0, 1.0]` using a Sigmoid function. If the best score falls below `0.35`, the relevance gate fails and returns an unanswerable refusal immediately, saving 100% of LLM generation costs.
+- **Relevance Gate**: The top-20 retrieved chunks are scored using `ms-marco-MiniLM-L-6-v2`. Raw scores are normalized to `[0.0, 1.0]` using a Sigmoid function. If the best score falls below `0.001`, the relevance gate fails and returns an unanswerable refusal immediately, saving 100% of LLM generation costs.
 - **Grounded Generator**: Prompts require strict citations matching retrieved text chunk IDs.
 - **Critic Pass**: A structured LLM check verifies that the answer is supported by the context. If it fails, it triggers 1 retry with critic feedback.
 
@@ -258,4 +258,42 @@ Chunk IDs are deterministic version-5 UUIDs generated from the SHA-256 hash of t
 - **Medium/Large Scale (>1M to 10M vectors)**: Running a self-hosted Qdrant instance inside Docker Compose on an AWS EC2 (e.g., `t3.medium` or `r6g.large`) yields **30% to 40% cost savings** compared to Qdrant Cloud starter/standard subscription plans.
 
 ### 6. Critic Self-Enhancement Bias
-Because we use the same LLM (`gpt-4o-mini`) for both generating answers and critiquing them, there is an inherent risk of **self-enhancement bias** (the model tends to grade its own answers favorably). We mitigate this bias by enforcing strict JSON validation, structured Pydantic schema validation for the critic (`is_grounded` boolean), and providing clear natural-language reasoning requirements in system prompts.
+Because we use **Groq (llama-3.1-8b-instant)** for both generating answers and critiquing them, there is an inherent risk of **self-enhancement bias**. We mitigate this by enforcing strict JSON validation, structured Pydantic schema validation for the critic (`is_grounded` boolean), and providing clear natural-language reasoning requirements in system prompts.
+
+---
+
+## 🖥️ Running the Project
+
+### 1. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Configure `.env`
+```env
+GROQ_API_KEY=your_groq_api_key
+QDRANT_URL=https://your-cluster.qdrant.io
+QDRANT_API_KEY=your_qdrant_api_key
+APP_API_KEY=rag123
+RELEVANCE_THRESHOLD=0.001
+```
+
+### 3. Start the server
+```bash
+python -m uvicorn app.api.main:app --reload
+```
+
+### 4. Open the UI
+Open **`http://localhost:8000`** in your browser — the **Groundwork** frontend will load.
+
+- Upload any `.pdf`, `.html`, or `.md` file using the Sources panel
+- Ask questions in the query box — answers are grounded strictly in your documents
+- Citations appear inline with each answer
+
+### 5. Ingest the sample data (optional)
+```bash
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: rag123" \
+  -d '{"directory_path": "./data"}'
+```
