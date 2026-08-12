@@ -22,6 +22,34 @@ class CriticCheck(BaseModel):
     is_grounded: bool = Field(description="True if every fact in the answer is directly supported by the context. False if there are hallucinations or outside information.")
     reason: str = Field(description="Explanation of the findings, explaining any ungrounded statements.")
 
+def _groq_style_structured_call(client, messages, response_format, **kwargs):
+    """Structured call using json_object mode — Groq and OpenAI compatible."""
+    model = kwargs.get("model", "llama-3.1-8b-instant")
+    msgs = list(messages)
+    hint = "IMPORTANT: Return ONLY a valid JSON object matching the requested schema."
+    if msgs and msgs[0]["role"] == "system":
+        msgs[0] = {"role": "system", "content": msgs[0]["content"] + "\n\n" + hint}
+    logger.info(f"Calling LLM with json_object mode (model={model})...")
+    response = client.chat.completions.create(
+        messages=msgs, model=model,
+        response_format={"type": "json_object"}, timeout=15.0
+    )
+    content = response.choices[0].message.content
+    parsed_obj = response_format.model_validate(json.loads(content))
+    p = getattr(response.usage, "prompt_tokens", 0) if response.usage else 0
+    c = getattr(response.usage, "completion_tokens", 0) if response.usage else 0
+
+    class _M:
+        def __init__(self, o, r): self.parsed = o; self.content = r
+    class _C:
+        def __init__(self, o, r): self.message = _M(o, r)
+    class _U:
+        def __init__(self, p, c): self.prompt_tokens=p; self.completion_tokens=c; self.total_tokens=p+c
+    class _R:
+        def __init__(self, o, r, p, c): self.choices=[_C(o,r)]; self.usage=_U(p,c)
+    return _R(parsed_obj, content, p, c)
+
+
 def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], response_format=None, fallback_client: Optional[OpenAI] = None, **kwargs) -> Any:
     """
     Utility to invoke OpenAI chat completions with exponential backoff on connection/timeout errors.
@@ -35,13 +63,8 @@ def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], respon
         for attempt in range(max_retries):
             try:
                 if response_format:
-                    logger.info("Calling OpenAI Structured completion...")
-                    return client.beta.chat.completions.parse(
-                        messages=messages,
-                        response_format=response_format,
-                        timeout=10.0,
-                        **kwargs
-                    )
+                    # Use json_object mode — works with Groq and OpenAI
+                    return _groq_style_structured_call(client, messages, response_format, **kwargs)
                 else:
                     logger.info("Calling OpenAI Standard completion...")
                     return client.chat.completions.create(
@@ -175,27 +198,26 @@ def compress_context(chunk_text: str, query: str, max_sentences: int = 3) -> str
 
 
 class AgenticQueryPipeline:
+    # Groq model to use for all LLM calls
+    GROQ_MODEL = "llama-3.1-8b-instant"
+
     def __init__(self, store: Optional[QdrantStore] = None):
         self.store = store or QdrantStore()
-        
-        # Initialize OpenAI client
-        if not Config.OPENAI_API_KEY:
-            logger.warning("OPENAI_API_KEY is not configured. Primary OpenAI client is disabled.")
-            self.client = None
-        else:
-            self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
-            
-        # Initialize Groq fallback client
+
+        # Groq is the primary LLM (OpenAI-compatible API)
         self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
         if self.groq_api_key:
-            self.fallback_client = OpenAI(
+            self.client = OpenAI(
                 base_url="https://api.groq.com/openai/v1",
                 api_key=self.groq_api_key
             )
-            logger.info("Groq fallback client initialized.")
+            logger.info("Groq client initialised as primary LLM.")
         else:
-            self.fallback_client = None
-            logger.warning("GROQ_API_KEY is not configured. Fallback client is disabled.")
+            self.client = None
+            logger.warning("GROQ_API_KEY is not configured. LLM calls will be disabled.")
+
+        # No separate fallback needed — Groq IS the client
+        self.fallback_client = None
 
     def analyze_query(self, query: str) -> str:
         """
@@ -234,7 +256,7 @@ class AgenticQueryPipeline:
                 client=self.client,
                 messages=messages,
                 response_format=QueryAnalysis,
-                model=Config.LLM_MODEL,
+                model=self.GROQ_MODEL,
                 temperature=0.0,
                 fallback_client=self.fallback_client
             )
@@ -308,7 +330,7 @@ class AgenticQueryPipeline:
         """
         Calls OpenAI to generate an answer grounded in the compressed context.
         """
-        if not self.client:
+        if not self.client and not self.fallback_client:
             return "insufficient context", 0, 0
 
         # Build context prompt
@@ -353,7 +375,7 @@ class AgenticQueryPipeline:
             completion = call_llm_with_backoff(
                 client=self.client,
                 messages=messages,
-                model=Config.LLM_MODEL,
+                model=self.GROQ_MODEL,
                 temperature=0.0,
                 fallback_client=self.fallback_client
             )
@@ -405,7 +427,7 @@ class AgenticQueryPipeline:
                 client=self.client,
                 messages=messages,
                 response_format=CriticCheck,
-                model=Config.LLM_MODEL,
+                model=self.GROQ_MODEL,
                 temperature=0.0,
                 fallback_client=self.fallback_client
             )
