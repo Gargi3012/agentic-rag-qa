@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
-import fitz  # PyMuPDF
+import pymupdf
 
 logger = logging.getLogger("agentic_rag.ingestion.loader")
 
@@ -18,7 +18,7 @@ def extract_pdf_text(file_path: str) -> Optional[str]:
     Logs a warning and skips scanned/non-extractable PDFs.
     """
     try:
-        doc = fitz.open(file_path)
+        doc = pymupdf.open(file_path)
         text_content = []
         for page_num, page in enumerate(doc):
             text = page.get_text()

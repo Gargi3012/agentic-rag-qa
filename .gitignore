@@ -11,6 +11,12 @@ ENV/
 
 # Qdrant data storage (local volume)
 qdrant_storage/
+qdrant_data/
+
+# Model Caches
+.cache/
+hf_cache/
+.fastembed_cache/
 
 # IDE settings
 .vscode/

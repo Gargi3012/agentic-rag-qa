@@ -12,13 +12,17 @@ logger = logging.getLogger("agentic_rag.eval.metrics")
 class JudgeEvaluation(BaseModel):
     faithfulness_score: int = Field(
         ..., 
-        description="Score from 1 (ungrounded, hallucinated, uses outside info) to 5 (fully grounded, supported by context, no extra assertions)."
+        description="Score from 1 to 5. 5 means the generated answer is strictly and fully supported by the retrieved context. For each factual claim, there must be a matching quote in the context. If the answer is 'insufficient context' and the context is empty, return 5. If the answer makes claims not present in the context, deduct points."
     )
     relevance_score: int = Field(
         ..., 
-        description="Score from 1 (irrelevant, refuses answer when answer is in context, off-topic) to 5 (directly addresses query, helpful, complete)."
+        description="Score from 1 to 5. 5 means the answer directly and fully addresses the user query. If the answer is 'insufficient context' and the context indeed has no information to answer the query, return 5. If the context has information but the system refuses, return 1."
     )
-    explanation: str = Field(..., description="Justification of the scores assigned.")
+    supporting_quotes: List[str] = Field(
+        ...,
+        description="List of exact sentence-level quotes extracted from the retrieved context that support the factual claims in the generated answer. Empty list if answer is 'insufficient context'."
+    )
+    explanation: str = Field(..., description="Justification of the scores assigned, referencing specific sentences and quotes.")
 
 # 1. Retrieval Metrics
 
@@ -160,7 +164,8 @@ def run_llm_judge_eval(
     openai_client: OpenAI,
     query: str,
     answer: str,
-    context: str
+    context: str,
+    fallback_client: Optional[OpenAI] = None
 ) -> JudgeEvaluation:
     """
     Calls OpenAI to evaluate faithfulness and relevance scores (1-5 scale) with an explanation.
@@ -176,15 +181,18 @@ def run_llm_judge_eval(
         "Evaluate the generated answer against the provided Context and User Query. "
         "Score the answer on two independent scales from 1 (worst) to 5 (best):\n\n"
         "1. Faithfulness (Groundedness):\n"
-        "   - 5: The answer is entirely supported by the context. No external claims or extrapolations.\n"
-        "   - 3: Most claims are backed, but contains slight outside details or assumptions.\n"
+        "   - 5: The answer is entirely supported by the context. No external claims, extrapolations, or hallucinations. Every factual statement has an exact matching supporting sentence in the context.\n"
+        "   - 3: Most claims are backed, but contains slight outside details, assumptions, or lacks exact supporting quotes.\n"
         "   - 1: Answer contains significant hallucinations, fabricated facts, or completely ignores the context.\n\n"
         "2. Answer Relevance:\n"
         "   - 5: Answer perfectly and directly answers the user's question.\n"
         "   - 3: Answer addresses the query, but is overly vague, wordy, or misses details.\n"
         "   - 1: Answer is completely off-topic or fails to answer the question entirely (e.g. refuses to answer when context is clear).\n\n"
-        "Note: If the answer is 'insufficient context' and the context indeed has NO information to answer the query, "
-        "it is considered highly faithful (5) and highly relevant (5). "
+        "CRITICAL INSTRUCTIONS:\n"
+        "- Locate and extract exact sentence-level quotes from the retrieved context that support each factual claim in the generated answer, and list them in the 'supporting_quotes' list.\n"
+        "- If the generated answer contains ANY statement that cannot be verified by a direct context quote, you MUST deduct points from the Faithfulness score.\n"
+        "- If the answer is 'insufficient context' and the context indeed has NO information to answer the query, "
+        "it is considered highly faithful (5) and highly relevant (5). The 'supporting_quotes' list should be empty.\n"
         "Output your evaluation strictly in the requested JSON structure."
     )
 
@@ -205,7 +213,8 @@ def run_llm_judge_eval(
             messages=messages,
             response_format=JudgeEvaluation,
             model=Config.LLM_MODEL,
-            temperature=0.0
+            temperature=0.0,
+            fallback_client=fallback_client
         )
         return completion.choices[0].message.parsed
     except Exception as e:
@@ -214,5 +223,6 @@ def run_llm_judge_eval(
         return JudgeEvaluation(
             faithfulness_score=3,
             relevance_score=3,
+            supporting_quotes=[],
             explanation=f"LLM Judge execution failed: {str(e)}"
         )

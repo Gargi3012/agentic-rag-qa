@@ -1,5 +1,7 @@
 import logging
 import time
+import os
+import json
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from openai import OpenAI
@@ -20,38 +22,122 @@ class CriticCheck(BaseModel):
     is_grounded: bool = Field(description="True if every fact in the answer is directly supported by the context. False if there are hallucinations or outside information.")
     reason: str = Field(description="Explanation of the findings, explaining any ungrounded statements.")
 
-def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], response_format=None, **kwargs) -> Any:
+def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], response_format=None, fallback_client: Optional[OpenAI] = None, **kwargs) -> Any:
     """
     Utility to invoke OpenAI chat completions with exponential backoff on connection/timeout errors.
+    Falls back to Groq client if OpenAI fails or is not configured.
     """
     max_retries = 3
     backoff = 2.0
     
-    for attempt in range(max_retries):
-        try:
-            if response_format:
-                return client.beta.chat.completions.parse(
-                    messages=messages,
-                    response_format=response_format,
-                    timeout=10.0,
-                    **kwargs
-                )
-            else:
-                return client.chat.completions.create(
-                    messages=messages,
-                    timeout=10.0,
-                    **kwargs
-                )
-        except (openai.APITimeoutError, openai.APIConnectionError, openai.RateLimitError) as e:
-            if attempt == max_retries - 1:
-                logger.error(f"OpenAI API call failed after {max_retries} retries: {str(e)}")
+    # Try calling OpenAI
+    if client:
+        for attempt in range(max_retries):
+            try:
+                if response_format:
+                    logger.info("Calling OpenAI Structured completion...")
+                    return client.beta.chat.completions.parse(
+                        messages=messages,
+                        response_format=response_format,
+                        timeout=10.0,
+                        **kwargs
+                    )
+                else:
+                    logger.info("Calling OpenAI Standard completion...")
+                    return client.chat.completions.create(
+                        messages=messages,
+                        timeout=10.0,
+                        **kwargs
+                    )
+            except (openai.APITimeoutError, openai.APIConnectionError, openai.RateLimitError) as e:
+                # If OpenAI quota/rate limits are hit, try fallback immediately if available
+                if fallback_client:
+                    logger.warning(f"OpenAI error: {str(e)}. Falling back to Groq immediately...")
+                    break
+                
+                if attempt == max_retries - 1:
+                    logger.error(f"OpenAI API call failed after {max_retries} retries: {str(e)}")
+                    raise e
+                sleep_time = backoff ** (attempt + 1)
+                logger.warning(f"OpenAI API error: {str(e)}. Retrying in {sleep_time:.2f} seconds...")
+                time.sleep(sleep_time)
+            except Exception as e:
+                # Any other OpenAI error (like quota exceeded)
+                if fallback_client:
+                    logger.warning(f"OpenAI error ({str(e)}). Falling back to Groq immediately...")
+                    break
+                logger.error(f"Unexpected OpenAI error: {str(e)}")
                 raise e
-            sleep_time = backoff ** (attempt + 1)
-            logger.warning(f"OpenAI API error: {str(e)}. Retrying in {sleep_time:.2f} seconds...")
-            time.sleep(sleep_time)
-        except Exception as e:
-            logger.error(f"Unexpected OpenAI error: {str(e)}")
-            raise e
+
+    # Fallback to Groq if OpenAI failed or was skipped
+    if fallback_client:
+        logger.info("Executing fallback call to Groq client...")
+        try:
+            # Replace model with Groq Llama 3.1 8B model
+            groq_model = "llama-3.1-8b-instant"
+            
+            if response_format:
+                # Groq doesn't support beta.chat.completions.parse, so use json_object mode
+                # We need to instruct the model to return JSON in the system prompt
+                modified_messages = list(messages)
+                json_instruction = "IMPORTANT: Return the response ONLY as a valid JSON object matching the requested schema."
+                if modified_messages[0]["role"] == "system":
+                    modified_messages[0] = {
+                        "role": "system",
+                        "content": modified_messages[0]["content"] + "\n\n" + json_instruction
+                    }
+                
+                logger.info(f"Calling Groq with JSON format using {groq_model}...")
+                response = fallback_client.chat.completions.create(
+                    messages=modified_messages,
+                    model=groq_model,
+                    response_format={"type": "json_object"},
+                    timeout=10.0
+                )
+                
+                # Parse string content
+                content = response.choices[0].message.content
+                logger.info(f"Groq raw response: {content}")
+                parsed_json = json.loads(content)
+                parsed_obj = response_format.model_validate(parsed_json)
+                
+                # Mock the completion object
+                prompt_tokens = getattr(response.usage, "prompt_tokens", 0) if response.usage else 0
+                completion_tokens = getattr(response.usage, "completion_tokens", 0) if response.usage else 0
+                
+                class MockParsedMessage:
+                    def __init__(self, obj, raw_content):
+                        self.parsed = obj
+                        self.content = raw_content
+
+                class MockChoice:
+                    def __init__(self, obj, raw_content):
+                        self.message = MockParsedMessage(obj, raw_content)
+
+                class MockUsage:
+                    def __init__(self, p_tok, c_tok):
+                        self.prompt_tokens = p_tok
+                        self.completion_tokens = c_tok
+                        self.total_tokens = p_tok + c_tok
+
+                class MockCompletion:
+                    def __init__(self, obj, raw_content, p_tok, c_tok):
+                        self.choices = [MockChoice(obj, raw_content)]
+                        self.usage = MockUsage(p_tok, c_tok)
+
+                return MockCompletion(parsed_obj, content, prompt_tokens, completion_tokens)
+            else:
+                logger.info(f"Calling Groq standard completion using {groq_model}...")
+                return fallback_client.chat.completions.create(
+                    messages=messages,
+                    model=groq_model,
+                    timeout=10.0
+                )
+        except Exception as groq_e:
+            logger.error(f"Groq fallback call failed: {str(groq_e)}")
+            raise groq_e
+    else:
+        raise RuntimeError("No LLM client (OpenAI or Groq) succeeded or was configured.")
 
 
 import re
@@ -92,11 +178,24 @@ class AgenticQueryPipeline:
     def __init__(self, store: Optional[QdrantStore] = None):
         self.store = store or QdrantStore()
         
+        # Initialize OpenAI client
         if not Config.OPENAI_API_KEY:
-            logger.warning("OPENAI_API_KEY is not configured. LLM calls will fail.")
+            logger.warning("OPENAI_API_KEY is not configured. Primary OpenAI client is disabled.")
             self.client = None
         else:
             self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
+            
+        # Initialize Groq fallback client
+        self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
+        if self.groq_api_key:
+            self.fallback_client = OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=self.groq_api_key
+            )
+            logger.info("Groq fallback client initialized.")
+        else:
+            self.fallback_client = None
+            logger.warning("GROQ_API_KEY is not configured. Fallback client is disabled.")
 
     def analyze_query(self, query: str) -> str:
         """
@@ -136,7 +235,8 @@ class AgenticQueryPipeline:
                 messages=messages,
                 response_format=QueryAnalysis,
                 model=Config.LLM_MODEL,
-                temperature=0.0
+                temperature=0.0,
+                fallback_client=self.fallback_client
             )
             analysis: QueryAnalysis = completion.choices[0].message.parsed
             
@@ -168,7 +268,7 @@ class AgenticQueryPipeline:
             # If Qdrant search fails, return empty list (handled downstream by relevance gate)
             return []
 
-    def rerank_and_gate(self, query: str, chunks: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool]:
+    def rerank_and_gate(self, query: str, chunks: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool, float]:
         """
         Step 3 & 4: Cross-Encoder Reranking & Relevance Gate
         Reranks top-20 chunks using local Cross-Encoder.
@@ -176,7 +276,7 @@ class AgenticQueryPipeline:
         """
         if not chunks:
             logger.info("No chunks to rerank. Relevance gate failed.")
-            return [], False
+            return [], False, 0.0
             
         logger.info(f"Reranking {len(chunks)} chunks using Cross-Encoder...")
         # Get top-5 reranked chunks
@@ -184,17 +284,17 @@ class AgenticQueryPipeline:
         
         if not reranked:
             logger.info("Rerank returned no documents. Relevance gate failed.")
-            return [], False
+            return [], False, 0.0
             
         best_score = reranked[0]["rerank_score"]
         logger.info(f"Reranked top chunk score: {best_score:.4f} (Threshold: {Config.RELEVANCE_THRESHOLD})")
         
         if best_score < Config.RELEVANCE_THRESHOLD:
             logger.warning(f"Best score {best_score:.4f} is below relevance threshold {Config.RELEVANCE_THRESHOLD}. Gate failed.")
-            return [], False
+            return [], False, float(best_score)
             
         logger.info(f"Relevance gate passed. Proceeding with {len(reranked)} chunks.")
-        return reranked, True
+        return reranked, True, float(best_score)
 
 
 # Add these methods to AgenticQueryPipeline
@@ -254,7 +354,8 @@ class AgenticQueryPipeline:
                 client=self.client,
                 messages=messages,
                 model=Config.LLM_MODEL,
-                temperature=0.0
+                temperature=0.0,
+                fallback_client=self.fallback_client
             )
             answer = completion.choices[0].message.content.strip()
             prompt_tokens = completion.usage.prompt_tokens
@@ -305,7 +406,8 @@ class AgenticQueryPipeline:
                 messages=messages,
                 response_format=CriticCheck,
                 model=Config.LLM_MODEL,
-                temperature=0.0
+                temperature=0.0,
+                fallback_client=self.fallback_client
             )
             check: CriticCheck = completion.choices[0].message.parsed
             prompt_tokens = completion.usage.prompt_tokens
@@ -349,7 +451,7 @@ class AgenticQueryPipeline:
         retrieved_chunks = self.retrieve_context(rewritten_query, filter_dict)
         
         # 3 & 4. Cross-Encoder Reranking & Relevance Gate
-        reranked_chunks, passed_gate = self.rerank_and_gate(rewritten_query, retrieved_chunks)
+        reranked_chunks, passed_gate, best_rerank_score = self.rerank_and_gate(rewritten_query, retrieved_chunks)
         
         if not passed_gate:
             latency = (time.time() - start_time) * 1000
@@ -361,7 +463,8 @@ class AgenticQueryPipeline:
                 "status": "relevance_gate_refusal",
                 "latency_ms": latency,
                 "cost": 0.0,
-                "tokens_used": 0
+                "tokens_used": 0,
+                "rerank_score": best_rerank_score
             }
 
         # 5 & 6. Grounded Generation
@@ -376,13 +479,21 @@ class AgenticQueryPipeline:
             cost = (total_prompt_tokens * 0.00000015) + (total_completion_tokens * 0.00000060)
             return {
                 "answer": "insufficient context",
-                "chunks": [],
+                "chunks": [
+                    {
+                        "id": c["id"],
+                        "text": c["text"],
+                        "metadata": c["metadata"],
+                        "score": c.get("rerank_score", 0.0)
+                    } for c in reranked_chunks
+                ],
                 "confidence": "none",
                 "retries": 0,
                 "status": "model_refusal",
                 "latency_ms": latency,
                 "cost": cost,
-                "tokens_used": total_prompt_tokens + total_completion_tokens
+                "tokens_used": total_prompt_tokens + total_completion_tokens,
+                "rerank_score": best_rerank_score
             }
 
         # 7. Critic Pass
@@ -435,5 +546,6 @@ class AgenticQueryPipeline:
             "status": "success",
             "latency_ms": latency,
             "cost": cost,
-            "tokens_used": total_prompt_tokens + total_completion_tokens
+            "tokens_used": total_prompt_tokens + total_completion_tokens,
+            "rerank_score": best_rerank_score
         }

@@ -106,5 +106,24 @@
     "query": "How many moons does Mars have?",
     "relevant_chunk_ids": [],
     "gold_answer": "insufficient context"
+  },
+  {
+    "id": "q19",
+    "query": "How do Qdrant and FastAPI integrate for vector search, and what are the traveling rules in basketball?",
+    "relevant_chunk_ids": [
+      "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+      "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+      "a82198d0-fb43-5d4c-9d0b-e2b8ce23fa2d"
+    ],
+    "gold_answer": "FastAPI integrates with Qdrant by declaring a dependency injection for the Qdrant client. In basketball, traveling is a violation where a player walks with the ball without dribbling."
+  },
+  {
+    "id": "q20",
+    "query": "What is the difference between parent-child chunking and hierarchical indexing, and how do you prepare Italian pasta carbonara?",
+    "relevant_chunk_ids": [
+      "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+      "df95d549-ead4-57af-baa2-d3d40cb3a8f6"
+    ],
+    "gold_answer": "Parent-child chunking uses nested small chunks for search and large chunks for context, while hierarchical indexing structures documents into multi-level nodes. Pasta carbonara is made by boiling spaghetti, frying guanciale, and stirring in egg yolks, Pecorino Romano, and black pepper."
   }
 ]

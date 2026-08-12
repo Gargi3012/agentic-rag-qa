@@ -1,8 +1,43 @@
 # Cost-Efficient Agentic RAG QA Service
 
-This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant (Hybrid Search with Reciprocal Rank Fusion), and OpenAI `gpt-4o-mini`. 
+This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant, and OpenAI `gpt-4o-mini`. 
+
+- **Vector Store Chosen**: **Qdrant** (Self-hosted via Docker / Qdrant Cloud).
+- **One-line Why**: Selected Qdrant because it natively supports both dense vectors and FastEmbed sparse BM25 vectors, permitting server-side Reciprocal Rank Fusion (RRF) in a single high-performance API query.
 
 Retrieval embedding cost is kept strictly at **$0.00** by generating dense embeddings (`all-MiniLM-L6-v2`) and sparse indices (BM25) locally. Generation cost is optimized via relevance gating (short-circuiting unanswerable questions) and sentence-level context compression.
+
+---
+
+## 📐 System Architecture Diagram
+
+```text
+                  [User Input Query]
+                          │
+                  [Query Analyzer]  (gpt-4o-mini structured rewrite, max 1)
+                          │
+                  [Hybrid Search]   (Dense MiniLM + Sparse BM25 via Qdrant RRF)
+                          │
+                [Cross-Encoder Rerank] (ms-marco-MiniLM-L-6-v2)
+                          │
+                  [Relevance Gate]  (Sigmoid score threshold check: 0.35)
+                         / \
+                        /   \
+                 (Passed)   (Failed) ──> [Refusal: insufficient context]
+                      /
+                     /
+           [Context Compressor]     (Sentence-level keyword overlap compression)
+                    │
+           [Grounded Generator]     (gpt-4o-mini with source [cite: chunk_id])
+                    │
+              [Critic Pass]         (gpt-4o-mini structured grounding check)
+                     / \
+                    /   \
+                 (Pass) (Fail) ───> [Regenerate with feedback (Max 1 retry)]
+                  /
+                 /
+          [Final Answer]            (telemetry metrics logged in JSON)
+```
 
 ---
 
@@ -76,6 +111,9 @@ cp .env.example .env
 Fill in the configuration details inside `.env`:
 - `OPENAI_API_KEY`: Your OpenAI API key (for query analysis, generation, and critique passes).
 - `APP_API_KEY`: Secret string header token used to protect FastAPI endpoints (e.g. `rag123`).
+- `QDRANT_URL`: Qdrant Cloud Cluster URL (optional).
+- `QDRANT_HOST` / `QDRANT_PORT`: Local container coordinates (defaults to `localhost` and `6333`).
+- `QDRANT_API_KEY`: Access Token key (needed only for Qdrant Cloud).
 - `RATE_LIMIT_RPM`: Requests-per-minute threshold (e.g., `60`).
 
 ### 2. Run the FastAPI Application Locally
@@ -83,7 +121,7 @@ Start the server in reload mode (automatically defaults to in-memory Qdrant fall
 ```bash
 # Initialize and activate virtual environment
 python -m venv .venv
-Source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -99,76 +137,53 @@ docker-compose up --build
 
 ---
 
-## 📊 Running Evaluations
+## 🔌 API Usage Examples
 
-The repository includes a self-contained evaluation harness that recreates a clean `agentic_rag_eval` collection, ingests sample documents from `data/`, executes 18 benchmark queries, and compiles analytics.
+All endpoints (except `/health`) require the `X-API-Key` header matching the `APP_API_KEY` defined in `.env`.
 
-Execute the harness:
-```bash
-python app/eval/harness.py
-```
-This generates:
-- **`eval_results.json`**: Raw execution metadata, token counts, costs, and pointwise evaluation metrics.
-- **`eval_report.md`**: Rendered markdown summary reports displaying Recall, nDCG, latencies, and an infrastructure vector DB pricing comparison table.
-
----
-
-## 🧪 Running Unit Tests
-
-The test suite is built using Python's standard `unittest` library and is instantly runnable without external testing packages:
-```bash
-python -m unittest tests/test_core.py
-```
-
----
-
-## 🔌 API Documentation
-
-All secured endpoints require the `X-API-Key` header matching the `APP_API_KEY` environment value.
-
-### 1. Health Diagnostics
-- **Route**: `GET /health` (Public)
-- **Description**: Verifies API server uptime and Qdrant backend connectivity.
-- **Response**:
-  ```json
-  {
-    "status": "healthy",
-    "timestamp": 1786467170.07,
-    "version": "0.1.0",
-    "uptime_seconds": 3600.0,
-    "qdrant_connected": true
-  }
-  ```
-
-### 2. Document Ingestion
-- **Route**: `POST /ingest` (Secured)
-- **Description**: Ingests all Markdown, HTML, and PDF documents within the specified directory path.
-- **Body**:
-  ```json
-  {
-    "directory_path": "d:\\agentic_rag\\data"
-  }
-  ```
-
-### 3. Agentic Query
-- **Route**: `POST /query` (Secured)
-- **Description**: Orchestrates the query analysis, hybrid RRF search, reranking, relevance gating, context compression, grounded generation, and critic self-correction.
-- **Body**:
-  ```json
-  {
-    "query": "How do you enable hybrid search in Qdrant?"
-  }
+### 1. Document Ingestion
+- **Route**: `POST /ingest`
+- **Description**: Loads, chunks, deduplicates, and stores documents from a local directory. By default, documents are split into chunks of `512` tokens with a `50` token overlap (can be overridden inside `.env`).
+- **Command**:
+  ```bash
+  curl -X POST http://localhost:8000/ingest \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: rag123" \
+    -d "{\"directory_path\": \"d:\\\\agentic_rag\\\\data\"}"
   ```
 - **Response**:
   ```json
   {
-    "answer": "To enable hybrid search in Qdrant, you must configure both dense and sparse vector indexes...",
+    "status": "success",
+    "message": "Ingestion completed.",
+    "files_processed": ["qdrant_guide.md", "fastapi_tutorial.md", "rag_overview.md"],
+    "total_chunks_indexed": 3
+  }
+  ```
+
+### 2. Agentic Query
+- **Route**: `POST /query`
+- **Description**: Evaluates the query, retrieves and reranks context, gates out-of-context inputs, generates answers with explicit citations, and runs self-correction passes.
+- **Command**:
+  ```bash
+  curl -X POST http://localhost:8000/query \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: rag123" \
+    -d "{\"query\": \"How do you enable hybrid search in Qdrant?\"}"
+  ```
+- **Response**:
+  ```json
+  {
+    "answer": "To enable hybrid search in Qdrant, you must configure both dense and sparse vector indexes. Dense search models semantic meaning using cosine distance, while sparse search models keyword match frequencies like BM25 [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].",
     "chunks": [
       {
         "id": "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "text": "...",
-        "metadata": { "filename": "qdrant_guide.md" },
-        "score": 0.985
+        "text": "To enable hybrid search in Qdrant, you must configure both dense and sparse vector indexes. Dense search models semantic meaning using cosine distance, while sparse search models keyword match frequencies like BM25.",
+        "metadata": {
+          "filename": "qdrant_guide.md",
+          "file_path": "d:\\agentic_rag\\data\\qdrant_guide.md"
+        },
+        "score": 0.9852
       }
     ],
     "confidence": "high",
@@ -180,6 +195,67 @@ All secured endpoints require the `X-API-Key` header matching the `APP_API_KEY` 
   }
   ```
 
-### 4. Observability Metrics
-- **Route**: `GET /metrics` (Secured)
-- **Description**: Returns running aggregates, average request latency, and a log of the last 50 queries.
+### 3. Telemetry Metrics
+- **Route**: `GET /metrics`
+- **Command**:
+  ```bash
+  curl -X GET http://localhost:8000/metrics \
+    -H "X-API-Key: rag123"
+  ```
+- **Response**:
+  ```json
+  {
+    "uptime_seconds": 1254.3,
+    "total_queries": 15,
+    "success_rate_percent": 93.33,
+    "average_latency_ms": 3200.4,
+    "total_tokens_used": 24500,
+    "total_cost_usd": 0.00542,
+    "query_history": [...]
+  }
+  ```
+
+---
+
+## 📊 Benchmarking & Testing
+
+### Running Benchmark Evaluations
+Calculates recall, MRR, nDCG, context precision, and LLM-as-a-judge scores over a 18-query dataset:
+```bash
+python app/eval/harness.py
+```
+Outputs are written to [eval_results.json](file:///d:/agentic_rag/eval_results.json) and [eval_report.md](file:///d:/agentic_rag/eval_report.md).
+
+### Running Core Unit Tests
+Runs the built-in python test suite:
+```bash
+python -m unittest tests/test_core.py
+```
+
+---
+
+## 📐 Design Decisions & Architectural Trade-offs
+
+### 1. Chunking Strategy & Rationale
+We implemented a semantic-aware, token-budgeted recursive character splitter (`TokenRecursiveCharacterSplitter`). It splits text recursively by structural separators (first `\n\n`, then `\n`, then `" "`) to keep sentences and paragraphs intact. It counts splits in tokens using the `tiktoken` tokenizer (`cl100k_base` model) instead of characters, preventing context fragmentation while keeping chunks strictly within model token budgets.
+
+### 2. Embedding Model Cost/Quality Trade-offs
+To keep embedding costs at **$0.00**, we utilize local models:
+- **Dense Vectors**: Cached HuggingFace `all-MiniLM-L6-v2` (384 dimensions) running locally on CPU.
+- **Sparse Vectors**: FastEmbed `Qdrant/bm25` running locally on CPU.
+*Trade-off*: Local models have slightly lower recall compared to paid commercial embeddings (e.g. OpenAI's `text-embedding-3-large`). We mitigate this by utilizing local Cross-Encoder reranking to ensure high relevance of the top-5 chunks before generation.
+
+### 3. No-Hallucination Gate & Gating Loops
+- **Relevance Gate**: The top-20 retrieved chunks are scored using `ms-marco-MiniLM-L-6-v2`. Raw scores are normalized to `[0.0, 1.0]` using a Sigmoid function. If the best score falls below `0.35`, the relevance gate fails and returns an unanswerable refusal immediately, saving 100% of LLM generation costs.
+- **Grounded Generator**: Prompts require strict citations matching retrieved text chunk IDs.
+- **Critic Pass**: A structured LLM check verifies that the answer is supported by the context. If it fails, it triggers 1 retry with critic feedback.
+
+### 4. Idempotency Re-ingestion Guarantee
+Chunk IDs are deterministic version-5 UUIDs generated from the SHA-256 hash of the chunk text combined with the file path. Windows paths are normalized (lowercase and forward-slashed) before hashing. Re-ingesting files overwrites existing points in Qdrant instead of accumulating duplicates, ensuring idempotency.
+
+### 5. Self-Hosted vs. Managed DB Pricing Inflection Tiers
+- **Small-Scale (<100K vectors)**: Managed serverless tiers (like Qdrant Cloud Free tier or Pinecone Serverless) are highly economical due to low minimum monthly fees.
+- **Medium/Large Scale (>1M to 10M vectors)**: Running a self-hosted Qdrant instance inside Docker Compose on an AWS EC2 (e.g., `t3.medium` or `r6g.large`) yields **30% to 40% cost savings** compared to Qdrant Cloud starter/standard subscription plans.
+
+### 6. Critic Self-Enhancement Bias
+Because we use the same LLM (`gpt-4o-mini`) for both generating answers and critiquing them, there is an inherent risk of **self-enhancement bias** (the model tends to grade its own answers favorably). We mitigate this bias by enforcing strict JSON validation, structured Pydantic schema validation for the critic (`is_grounded` boolean), and providing clear natural-language reasoning requirements in system prompts.

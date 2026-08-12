@@ -1,19 +1,66 @@
 {
   "aggregates": {
-    "average_recall_5": 0.7777777777777778,
-    "average_mrr": 0.7777777777777778,
-    "average_ndcg_5": 0.7777777777777778,
-    "average_context_precision_5": 0.7777777777777778,
-    "average_exact_match": 0.16666666666666666,
-    "average_f1_score": 0.5514547998920322,
-    "average_faithfulness_score": 5.0,
+    "on_domain_recall_5": 0.9411764705882353,
+    "on_domain_mrr": 0.9117647058823529,
+    "on_domain_ndcg_5": 0.925460507086929,
+    "on_domain_context_precision_5": 0.9199346405228759,
+    "relevance_gate_accuracy": 1.0,
+    "average_exact_match": 0.15,
+    "average_f1_score": 0.5426156098308335,
+    "average_faithfulness_score": 4.95,
     "average_relevance_score": 5.0,
-    "total_cost_usd": 0.0036824999999999996,
-    "average_cost_per_query_usd": 0.0002045833333333333,
-    "p50_retrieval_latency_ms": 2248.0722665786743,
-    "p95_retrieval_latency_ms": 3223.782849311824,
-    "p50_full_pipeline_latency_ms": 4610.977530479431,
-    "p95_full_pipeline_latency_ms": 6466.593897342672
+    "total_cost_usd": 0.00583635,
+    "average_cost_per_query_usd": 0.0002918175,
+    "p50_retrieval_latency_ms": 2658.350110054016,
+    "p95_retrieval_latency_ms": 3714.979529380799,
+    "p50_full_pipeline_latency_ms": 5221.805930137634,
+    "p95_full_pipeline_latency_ms": 7896.457576751718
+  },
+  "vector_db_cost_comparison": {
+    "100K_vectors": {
+      "self_hosted_qdrant_usd_per_month": 15.0,
+      "self_hosted_assumptions": "AWS t3.small (2GB RAM) + gp3 storage",
+      "managed_vector_db_usd_per_month": 10.0,
+      "managed_assumptions": "Qdrant Cloud Free Tier / Pinecone Serverless minimum",
+      "savings_usd_per_month": -5.0,
+      "savings_percent": -50.0
+    },
+    "1M_vectors": {
+      "self_hosted_qdrant_usd_per_month": 30.0,
+      "self_hosted_assumptions": "AWS t3.medium (4GB RAM) + gp3 storage",
+      "managed_vector_db_usd_per_month": 45.0,
+      "managed_assumptions": "Qdrant Cloud Starter Plan / Pinecone Serverless write/read usage",
+      "savings_usd_per_month": 15.0,
+      "savings_percent": 33.33
+    },
+    "10M_vectors": {
+      "self_hosted_qdrant_usd_per_month": 110.0,
+      "self_hosted_assumptions": "AWS r6g.large (16GB RAM + EBS gp3)",
+      "managed_vector_db_usd_per_month": 180.0,
+      "managed_assumptions": "Qdrant Cloud Standard Tier (redundant nodes)",
+      "savings_usd_per_month": 70.0,
+      "savings_percent": 38.89
+    }
+  },
+  "relevance_gate_details": {
+    "q16": {
+      "query": "Who is the president of France?",
+      "relevance_score": 1.5755733338743786e-05,
+      "threshold": 0.35,
+      "correctly_rejected": true
+    },
+    "q17": {
+      "query": "What is the capital of Japan?",
+      "relevance_score": 1.600895972315264e-05,
+      "threshold": 0.35,
+      "correctly_rejected": true
+    },
+    "q18": {
+      "query": "How many moons does Mars have?",
+      "relevance_score": 0.0002868849880711833,
+      "threshold": 0.35,
+      "correctly_rejected": true
+    }
   },
   "runs": [
     {
@@ -22,27 +69,34 @@
       "relevant_chunk_ids": [
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9"
       ],
-      "retrieved_chunk_ids": [],
+      "retrieved_chunk_ids": [
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "e91fdc89-ffd7-5b04-ba59-d9374a5ac27b",
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "632f3544-b2ed-5426-9333-b6e832c1cd73",
+        "f0486678-0683-54d0-b7e5-af24ca342577"
+      ],
       "gold_answer": "Qdrant is a self-hosted vector database designed for high-performance vector search.",
-      "generated_answer": "insufficient context",
-      "status": "model_refusal",
-      "retries": 0,
-      "cost_usd": 7.32e-05,
-      "tokens_used": 479,
-      "latency_ms": 12338.988780975342,
+      "generated_answer": "Qdrant is a self-hosted vector database designed for high-performance vector search. Its main features include the ability to store payload metadata alongside vectors, which makes filtered vector queries highly efficient. Qdrant is configured to enable hybrid search by using both dense and sparse vector indexes [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].\n\nIn terms of applications, Qdrant can be used in advanced sports analytics to track player movement on basketball courts, as it can store coordinates as sparse vectors [cite: e91fdc89-ffd7-5b04-ba59-d9374a5ac27b].",
+      "status": "success",
+      "retries": 1,
+      "cost_usd": 0.00093615,
+      "tokens_used": 4786,
+      "latency_ms": 19763.946771621704,
+      "rerank_score": 0.984484892370486,
       "metrics": {
-        "recall_1": 0.0,
-        "recall_5": 0.0,
-        "hit_rate_5": 0.0,
-        "mrr": 0.0,
-        "ndcg_5": 0.0,
-        "context_precision_5": 0.0,
+        "recall_1": 1.0,
+        "recall_5": 1.0,
+        "hit_rate_5": 1.0,
+        "mrr": 1.0,
+        "ndcg_5": 1.0,
+        "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.0,
-        "faithfulness_score": 5,
+        "f1_score": 0.22988505747126434,
+        "faithfulness_score": 4,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about Qdrant, the response is both faithful (as it does not fabricate information) and relevant (as it directly addresses the lack of context). Therefore, it scores the highest on both scales."
+      "judge_explanation": "The generated answer accurately describes Qdrant as a self-hosted vector database designed for high-performance vector search, which is directly supported by the context. The mention of storing payload metadata and enabling hybrid search is also backed by the context. However, the application of Qdrant in sports analytics is mentioned, but the specific claim that it can track player movement is not explicitly stated in the context, leading to a slight deduction in the faithfulness score. The answer is highly relevant as it directly addresses the user's query."
     },
     {
       "id": "q2",
@@ -52,16 +106,19 @@
       ],
       "retrieved_chunk_ids": [
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "e91fdc89-ffd7-5b04-ba59-d9374a5ac27b",
         "f0486678-0683-54d0-b7e5-af24ca342577",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
         "99ebe920-740d-525f-b1e6-52ad55b3fe22"
       ],
       "gold_answer": "To enable hybrid search in Qdrant, you must configure both dense (semantic search using cosine distance) and sparse (keyword match frequencies like BM25) vector indexes.",
       "generated_answer": "To enable hybrid search in Qdrant, you must configure both dense and sparse vector indexes. Dense search models semantic meaning using cosine distance, while sparse search models keyword match frequencies like BM25 [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00030585,
-      "tokens_used": 1664,
-      "latency_ms": 5238.625764846802,
+      "cost_usd": 0.00038819999999999995,
+      "tokens_used": 2246,
+      "latency_ms": 4918.537616729736,
+      "rerank_score": 0.999798528993074,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -74,7 +131,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer is entirely supported by the context provided. It accurately describes the steps needed to enable hybrid search in Qdrant, specifically mentioning the configuration of both dense and sparse vector indexes, which is directly stated in the context. There are no external claims or assumptions made, and the citation to the relevant context ID further reinforces its groundedness. Additionally, the answer directly addresses the user's query without any vagueness or unnecessary information."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context. It correctly states that enabling hybrid search in Qdrant requires configuring both dense and sparse vector indexes, and it explains the roles of dense and sparse searches, which are directly supported by the context. The supporting quotes from the context match the claims made in the answer, confirming its faithfulness and relevance."
     },
     {
       "id": "q3",
@@ -84,16 +141,19 @@
       ],
       "retrieved_chunk_ids": [
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "e91fdc89-ffd7-5b04-ba59-d9374a5ac27b",
         "f0486678-0683-54d0-b7e5-af24ca342577",
-        "99ebe920-740d-525f-b1e6-52ad55b3fe22"
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6"
       ],
       "gold_answer": "Dense search in Qdrant models semantic meaning using cosine distance.",
       "generated_answer": "Dense search in Qdrant uses cosine distance as its distance metric [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00029564999999999995,
-      "tokens_used": 1632,
-      "latency_ms": 4577.594518661499,
+      "cost_usd": 0.00036359999999999995,
+      "tokens_used": 2085,
+      "latency_ms": 7268.904209136963,
+      "rerank_score": 0.9886944891809593,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -106,7 +166,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately states that dense search in Qdrant uses cosine distance as its distance metric, which is directly supported by the context provided. There are no external claims or assumptions made, and the answer directly addresses the user's query."
+      "judge_explanation": "The generated answer accurately states that dense search in Qdrant uses cosine distance as its distance metric. This claim is directly supported by the context, which states, 'Dense search models semantic meaning using cosine distance.' There are no external claims or unsupported statements in the answer, making it fully grounded in the provided context."
     },
     {
       "id": "q4",
@@ -117,15 +177,18 @@
       "retrieved_chunk_ids": [
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
         "f0486678-0683-54d0-b7e5-af24ca342577",
-        "99ebe920-740d-525f-b1e6-52ad55b3fe22"
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6",
+        "42269c6d-741e-50b1-b2c1-3010ad262d08"
       ],
       "gold_answer": "The RRF formula is Score = Sum( 1 / (rank + k) ) where rank is the document rank and k is a constant parameter.",
       "generated_answer": "The formula for Reciprocal Rank Fusion (RRF) is:\n\nScore = Sum( 1 / (rank + k) )\n\nwhere k is a constant parameter (often set to 60) that penalizes low-ranked documents [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00030629999999999996,
-      "tokens_used": 1700,
-      "latency_ms": 5217.069387435913,
+      "cost_usd": 0.00036825,
+      "tokens_used": 2089,
+      "latency_ms": 4745.2099323272705,
+      "rerank_score": 0.9976269932225695,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -138,7 +201,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately presents the formula for Reciprocal Rank Fusion (RRF) as stated in the context. It includes the necessary details about the formula and the role of the constant parameter k, which is also mentioned in the context. The answer is directly relevant to the user's query and does not introduce any external information or assumptions."
+      "judge_explanation": "The generated answer accurately presents the formula for Reciprocal Rank Fusion (RRF) as stated in the context. The exact formula and the explanation of the constant parameter k are both directly quoted from the context, ensuring full support for the claims made in the answer."
     },
     {
       "id": "q5",
@@ -149,15 +212,18 @@
       "retrieved_chunk_ids": [
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
         "f0486678-0683-54d0-b7e5-af24ca342577",
+        "632f3544-b2ed-5426-9333-b6e832c1cd73",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
         "99ebe920-740d-525f-b1e6-52ad55b3fe22"
       ],
       "gold_answer": "The constant parameter k (often set to 60) in the RRF formula penalizes low-ranked documents, guaranteeing high-ranking consistency across diverse embedding spaces.",
       "generated_answer": "The parameter k in the Reciprocal Rank Fusion (RRF) formula is a constant that penalizes low-ranked documents. It is often set to 60. The formula for RRF is: Score = Sum( 1 / (rank + k) ) [cite: 20da95a1-d819-57a5-bbe0-3bfc49e60ab9].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00032744999999999996,
-      "tokens_used": 1751,
-      "latency_ms": 5230.589389801025,
+      "cost_usd": 0.00040934999999999995,
+      "tokens_used": 2297,
+      "latency_ms": 6045.226812362671,
+      "rerank_score": 0.9785800172124208,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -170,7 +236,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately describes the role of parameter k in the RRF formula as stated in the context. It correctly identifies that k is a constant that penalizes low-ranked documents and mentions its typical value of 60. Additionally, the answer includes the formula for RRF, which is directly supported by the context provided. Therefore, the answer is both fully grounded in the context and directly relevant to the user's query."
+      "judge_explanation": "The generated answer accurately describes the role of parameter k in the RRF formula, stating that it penalizes low-ranked documents and is often set to 60. Both claims are directly supported by the context, with exact quotes provided. Additionally, the answer includes the formula for RRF, which is also present in the context, ensuring full alignment with the provided information."
     },
     {
       "id": "q6",
@@ -181,15 +247,18 @@
       "retrieved_chunk_ids": [
         "99ebe920-740d-525f-b1e6-52ad55b3fe22",
         "f0486678-0683-54d0-b7e5-af24ca342577",
-        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9"
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "42269c6d-741e-50b1-b2c1-3010ad262d08"
       ],
       "gold_answer": "FastAPI is built on top of Starlette and Pydantic.",
       "generated_answer": "FastAPI is built on top of Starlette and Pydantic [cite: 99ebe920-740d-525f-b1e6-52ad55b3fe22].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00029969999999999997,
-      "tokens_used": 1641,
-      "latency_ms": 4611.276388168335,
+      "cost_usd": 0.00037605,
+      "tokens_used": 2159,
+      "latency_ms": 5185.624361038208,
+      "rerank_score": 0.9997579019998144,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -202,7 +271,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately states that FastAPI is built on top of Starlette and Pydantic, which is directly supported by the context provided. There are no external claims or assumptions made, and the answer directly addresses the user's query."
+      "judge_explanation": "The generated answer accurately states that FastAPI is built on top of Starlette and Pydantic, which is directly supported by the context. The quote from the context confirms this fact without any additional claims or assumptions, leading to a perfect score for faithfulness. Additionally, the answer directly addresses the user's query about the web framework FastAPI is built on, resulting in a perfect score for relevance."
     },
     {
       "id": "q7",
@@ -213,15 +282,18 @@
       "retrieved_chunk_ids": [
         "99ebe920-740d-525f-b1e6-52ad55b3fe22",
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "f0486678-0683-54d0-b7e5-af24ca342577"
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "f0486678-0683-54d0-b7e5-af24ca342577",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6"
       ],
       "gold_answer": "FastAPI leverages a dependency injection system (using Depends) to manage shared database connections, authentication credentials, and request filters.",
-      "generated_answer": "FastAPI manages shared database connections and authentication credentials for users through a dependency injection system using `Depends`. This allows for the definition of dependency functions that can handle tasks such as reading header values for authentication. For example, a function can be defined to check an API key from the request header, and if the key does not match a predefined value, it raises an HTTP exception to indicate unauthorized access [cite: 99ebe920-740d-525f-b1e6-52ad55b3fe22].",
+      "generated_answer": "FastAPI manages shared database connections, authentication credentials, and request filters using a dependency injection system with `Depends`. This allows for the extraction of auth headers, such as `X-API-Key`, before executing route logic [cite: 99ebe920-740d-525f-b1e6-52ad55b3fe22].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00035715,
-      "tokens_used": 1823,
-      "latency_ms": 5251.810550689697,
+      "cost_usd": 0.00038475,
+      "tokens_used": 2205,
+      "latency_ms": 6201.007127761841,
+      "rerank_score": 0.9991726859143617,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -230,11 +302,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.3296703296703296,
+        "f1_score": 0.576923076923077,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context about how FastAPI manages shared database connections and authentication credentials through its dependency injection system. It correctly mentions the use of `Depends` and provides an example of checking an API key, which is directly supported by the context. The answer is clear, concise, and directly addresses the user's query without introducing any external information or assumptions."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context. It correctly states that FastAPI uses a dependency injection system to manage shared database connections and authentication credentials, which is directly supported by the quote: 'FastAPI leverages a dependency injection system (using `Depends`) to manage shared database connections, authentication credentials, and request filters.' Additionally, it mentions the extraction of auth headers, which is also supported by the context. Therefore, both the faithfulness and relevance scores are 5."
     },
     {
       "id": "q8",
@@ -242,27 +314,34 @@
       "relevant_chunk_ids": [
         "99ebe920-740d-525f-b1e6-52ad55b3fe22"
       ],
-      "retrieved_chunk_ids": [],
+      "retrieved_chunk_ids": [
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "f0486678-0683-54d0-b7e5-af24ca342577",
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6"
+      ],
       "gold_answer": "You can declare an API key header check, defining a dependency function that reads the header value, such as extracting X-API-Key.",
       "generated_answer": "insufficient context",
       "status": "model_refusal",
       "retries": 0,
-      "cost_usd": 8.25e-05,
-      "tokens_used": 541,
-      "latency_ms": 2685.6091022491455,
+      "cost_usd": 0.00011295,
+      "tokens_used": 744,
+      "latency_ms": 4606.401681900024,
+      "rerank_score": 0.8980164528608886,
       "metrics": {
-        "recall_1": 0.0,
-        "recall_5": 0.0,
-        "hit_rate_5": 0.0,
-        "mrr": 0.0,
-        "ndcg_5": 0.0,
-        "context_precision_5": 0.0,
+        "recall_1": 1.0,
+        "recall_5": 1.0,
+        "hit_rate_5": 1.0,
+        "mrr": 1.0,
+        "ndcg_5": 1.0,
+        "context_precision_5": 1.0,
         "exact_match": 0.0,
         "f1_score": 0.0,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information to draw from, the response is entirely faithful and relevant, as it accurately reflects the lack of context to answer the user's query."
+      "judge_explanation": "The answer 'insufficient context' is appropriate because the provided context does not contain specific information about headers-based authentication in FastAPI. Therefore, the answer is both faithful and relevant, as it accurately reflects the lack of information in the context."
     },
     {
       "id": "q9",
@@ -273,15 +352,18 @@
       "retrieved_chunk_ids": [
         "99ebe920-740d-525f-b1e6-52ad55b3fe22",
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "f0486678-0683-54d0-b7e5-af24ca342577"
+        "f0486678-0683-54d0-b7e5-af24ca342577",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "a82198d0-fb43-5d4c-9d0b-e2b8ce23fa2d"
       ],
       "gold_answer": "FastAPI handles CORS policies via CORSMiddleware, protecting the backend from unauthorized cross-origin requests.",
       "generated_answer": "FastAPI handles CORS policies via CORSMiddleware, which protects the backend from unauthorized cross-origin requests [cite: 99ebe920-740d-525f-b1e6-52ad55b3fe22].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.0003,
-      "tokens_used": 1640,
-      "latency_ms": 4467.027187347412,
+      "cost_usd": 0.0003819,
+      "tokens_used": 2186,
+      "latency_ms": 5257.864713668823,
+      "rerank_score": 0.6927765100975372,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -294,7 +376,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding how FastAPI handles CORS policies. It directly cites the relevant section of the context, confirming that it is fully grounded and does not include any external claims or assumptions. Additionally, the answer is concise and directly addresses the user's query without any unnecessary details."
+      "judge_explanation": "The generated answer accurately states that FastAPI handles CORS policies via CORSMiddleware, which is directly supported by the context. The quote from the context matches the claim made in the answer perfectly, ensuring high faithfulness. Additionally, the answer directly addresses the user's query about how FastAPI manages CORS policies, making it highly relevant."
     },
     {
       "id": "q10",
@@ -302,27 +384,34 @@
       "relevant_chunk_ids": [
         "99ebe920-740d-525f-b1e6-52ad55b3fe22"
       ],
-      "retrieved_chunk_ids": [],
+      "retrieved_chunk_ids": [
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "f0486678-0683-54d0-b7e5-af24ca342577",
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "e91fdc89-ffd7-5b04-ba59-d9374a5ac27b"
+      ],
       "gold_answer": "FastAPI is built on top of Starlette (for routing) and Pydantic (for schema validation).",
       "generated_answer": "insufficient context",
       "status": "model_refusal",
       "retries": 0,
-      "cost_usd": 7.44e-05,
-      "tokens_used": 487,
-      "latency_ms": 2734.769105911255,
+      "cost_usd": 0.0001065,
+      "tokens_used": 701,
+      "latency_ms": 3355.3473949432373,
+      "rerank_score": 0.873694605050192,
       "metrics": {
-        "recall_1": 0.0,
-        "recall_5": 0.0,
-        "hit_rate_5": 0.0,
-        "mrr": 0.0,
-        "ndcg_5": 0.0,
-        "context_precision_5": 0.0,
+        "recall_1": 1.0,
+        "recall_5": 1.0,
+        "hit_rate_5": 1.0,
+        "mrr": 1.0,
+        "ndcg_5": 1.0,
+        "context_precision_5": 1.0,
         "exact_match": 0.0,
         "f1_score": 0.0,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the libraries FastAPI uses for routing and schema validation, the response is both faithful (as it accurately reflects the lack of context) and relevant (as it directly addresses the impossibility of answering the question due to the absence of information)."
+      "judge_explanation": "The answer 'insufficient context' is appropriate because the provided context does not contain any information about the specific libraries that FastAPI uses for routing and schema validation. Therefore, the answer is both faithful and relevant, as it accurately reflects the lack of information in the context."
     },
     {
       "id": "q11",
@@ -332,16 +421,19 @@
       ],
       "retrieved_chunk_ids": [
         "f0486678-0683-54d0-b7e5-af24ca342577",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "99ebe920-740d-525f-b1e6-52ad55b3fe22"
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "632f3544-b2ed-5426-9333-b6e832c1cd73"
       ],
       "gold_answer": "Retrieval-Augmented Generation (RAG) combines search retrieval with generative LLMs to answer questions using external domain context.",
       "generated_answer": "A Retrieval-Augmented Generation (RAG) system combines search retrieval with generative LLMs to answer questions using external domain context [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00029505,
-      "tokens_used": 1646,
-      "latency_ms": 4917.764663696289,
+      "cost_usd": 0.00037319999999999996,
+      "tokens_used": 2164,
+      "latency_ms": 6779.729843139648,
+      "rerank_score": 0.992437238517048,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -354,7 +446,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context about RAG, specifically stating that it combines search retrieval with generative LLMs to answer questions using external domain context. There are no external claims or assumptions made, and the answer directly addresses the user's query."
+      "judge_explanation": "The generated answer accurately reflects the information provided in the context. The statement about RAG combining search retrieval with generative LLMs is directly supported by the context, specifically the quote: 'Retrieval-Augmented Generation (RAG) combines search retrieval with generative LLMs to answer questions using external domain context.' There are no hallucinations or unsupported claims, and the answer directly addresses the user's query."
     },
     {
       "id": "q12",
@@ -364,16 +456,19 @@
       ],
       "retrieved_chunk_ids": [
         "f0486678-0683-54d0-b7e5-af24ca342577",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "99ebe920-740d-525f-b1e6-52ad55b3fe22"
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6",
+        "a82198d0-fb43-5d4c-9d0b-e2b8ce23fa2d"
       ],
       "gold_answer": "The RAG system uses a target chunk size of 512 tokens with a 50 token overlap.",
-      "generated_answer": "The target chunk size for the RAG system is 512 tokens with a 50 token overlap [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
+      "generated_answer": "The target chunk size used by the RAG system is 512 tokens, with a 50 token overlap to ensure that context transitions are preserved between neighboring chunks [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.00029144999999999996,
-      "tokens_used": 1613,
-      "latency_ms": 5236.447811126709,
+      "cost_usd": 0.00034305,
+      "tokens_used": 1996,
+      "latency_ms": 5987.333059310913,
+      "rerank_score": 0.9943579229665928,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -382,11 +477,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.7647058823529411,
+        "f1_score": 0.5777777777777777,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding the target chunk size and overlap used by the RAG system. It directly cites the relevant context ID, confirming its grounding in the provided text. Additionally, the answer is concise and directly addresses the user's query without any extraneous information."
+      "judge_explanation": "The generated answer accurately states the target chunk size and overlap used by the RAG system, which is directly supported by the context. The quote from the context confirms the details provided in the answer, making it fully grounded and relevant to the user's query."
     },
     {
       "id": "q13",
@@ -397,15 +492,18 @@
       "retrieved_chunk_ids": [
         "f0486678-0683-54d0-b7e5-af24ca342577",
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "99ebe920-740d-525f-b1e6-52ad55b3fe22"
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "42269c6d-741e-50b1-b2c1-3010ad262d08"
       ],
       "gold_answer": "A Cross-Encoder is integrated to re-rank top retrieval hits because standard dense vector search lacks detailed keyword-document cross-attention.",
-      "generated_answer": "The benefits of integrating a Cross-Encoder model, such as `ms-marco-MiniLM-L-6-v2`, into a machine learning system include the ability to re-rank the top retrieval hits by processing the query and document text together. This integration yields log-odds scores that can be normalized to a [0.0, 1.0] range via a sigmoid function, which enhances the detail of keyword-document cross-attention compared to standard dense vector search [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
+      "generated_answer": "Integrating a Cross-Encoder model like `ms-marco-MiniLM-L-6-v2` in information retrieval systems provides detailed keyword-document cross-attention, which enhances the re-ranking of the top retrieval hits. This integration addresses the limitations of standard dense vector search, which is fast but lacks this detailed attention mechanism [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.0003603,
-      "tokens_used": 1820,
-      "latency_ms": 5430.242300033569,
+      "cost_usd": 0.00037154999999999995,
+      "tokens_used": 2180,
+      "latency_ms": 6897.9949951171875,
+      "rerank_score": 0.8665952570525614,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -414,11 +512,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.3132530120481928,
+        "f1_score": 0.45161290322580644,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer is fully supported by the context provided, specifically detailing the benefits of integrating a Cross-Encoder like `ms-marco-MiniLM-L-6-v2` as mentioned in the context. It accurately describes how the Cross-Encoder processes query and document text together to yield log-odds scores, which aligns perfectly with the information in the context. Additionally, the answer directly addresses the user's query without introducing any external claims or assumptions, making it both faithful and relevant."
+      "judge_explanation": "The generated answer accurately reflects the context provided. It correctly states that integrating a Cross-Encoder like `ms-marco-MiniLM-L-6-v2` enhances the re-ranking of retrieval hits and addresses the limitations of standard dense vector search. Both claims are directly supported by the context, with specific quotes confirming the details about the Cross-Encoder and the limitations of dense vector search."
     },
     {
       "id": "q14",
@@ -429,15 +527,18 @@
       "retrieved_chunk_ids": [
         "f0486678-0683-54d0-b7e5-af24ca342577",
         "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
-        "99ebe920-740d-525f-b1e6-52ad55b3fe22"
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6"
       ],
       "gold_answer": "Cross-Encoder log-odds scores are normalized to a [0.0, 1.0] range via a sigmoid function.",
-      "generated_answer": "To normalize Cross-Encoder log-odds scores, you can use a sigmoid function to transform the scores to a [0.0, 1.0] range [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
+      "generated_answer": "You can normalize Cross-Encoder log-odds scores to a [0.0, 1.0] range via a sigmoid function [cite: f0486678-0683-54d0-b7e5-af24ca342577].",
       "status": "success",
       "retries": 0,
-      "cost_usd": 0.0003135,
-      "tokens_used": 1667,
-      "latency_ms": 4610.609292984009,
+      "cost_usd": 0.00038924999999999995,
+      "tokens_used": 2190,
+      "latency_ms": 6399.575471878052,
+      "rerank_score": 0.8964984556070469,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -446,11 +547,11 @@
         "ndcg_5": 1.0,
         "context_precision_5": 1.0,
         "exact_match": 0.0,
-        "f1_score": 0.5555555555555556,
+        "f1_score": 0.7096774193548386,
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The generated answer accurately reflects the information provided in the context regarding the normalization of Cross-Encoder log-odds scores using a sigmoid function. It does not introduce any external claims or assumptions, and it directly addresses the user's query in a clear and concise manner."
+      "judge_explanation": "The generated answer accurately states that Cross-Encoder log-odds scores can be normalized to a [0.0, 1.0] range via a sigmoid function, which is directly supported by the context. The quote from the context confirms this claim, making the answer fully grounded and relevant to the user's query."
     },
     {
       "id": "q15",
@@ -465,7 +566,8 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1809.6482753753662,
+      "latency_ms": 2389.9214267730713,
+      "rerank_score": 0.005238123475652571,
       "metrics": {
         "recall_1": 0.0,
         "recall_5": 0.0,
@@ -478,7 +580,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the maximum retry limit for the Critique Pass, the response is both faithful (as it accurately reflects the lack of information) and relevant (as it directly addresses the inability to provide an answer due to the context)."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context is empty. There are no claims made that require support, and the answer accurately reflects the lack of information available."
     },
     {
       "id": "q16",
@@ -491,7 +593,8 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 2332.920789718628,
+      "latency_ms": 2764.0719413757324,
+      "rerank_score": 1.5755733338743786e-05,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -504,7 +607,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty and does not contain any information about the president of France. Therefore, the answer is fully grounded in the context and directly addresses the user's query by indicating that there is not enough information to provide a response."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context is empty and does not provide any information regarding the president of France. Therefore, the answer is both faithful (5) and relevant (5) as it accurately reflects the lack of information."
     },
     {
       "id": "q17",
@@ -517,7 +620,8 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1897.538661956787,
+      "latency_ms": 3158.7278842926025,
+      "rerank_score": 1.600895972315264e-05,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -530,7 +634,7 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the capital of Japan, the response is both faithful (as it does not fabricate information) and relevant (as it acknowledges the lack of context to provide an answer). Therefore, both scores are the highest possible."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context is empty. There are no claims made that require support from the context, and the answer accurately reflects the lack of information available. Therefore, it scores a 5 for both faithfulness and relevance."
     },
     {
       "id": "q18",
@@ -543,7 +647,8 @@
       "retries": 0,
       "cost_usd": 0.0,
       "tokens_used": 0,
-      "latency_ms": 1774.5416164398193,
+      "latency_ms": 3018.86248588562,
+      "rerank_score": 0.0002868849880711833,
       "metrics": {
         "recall_1": 1.0,
         "recall_5": 1.0,
@@ -556,7 +661,80 @@
         "faithfulness_score": 5,
         "relevance_score": 5
       },
-      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context provided is empty. Since there is no information available to answer the user's query about the number of moons Mars has, the response is both faithful (as it accurately reflects the lack of information) and relevant (as it directly addresses the inability to provide an answer due to the absence of context)."
+      "judge_explanation": "The answer 'insufficient context' is appropriate given that the context is empty. There are no claims made that require support, and the answer accurately reflects the lack of information available. Therefore, it scores a 5 for both faithfulness and relevance."
+    },
+    {
+      "id": "q19",
+      "query": "How do Qdrant and FastAPI integrate for vector search, and what are the traveling rules in basketball?",
+      "relevant_chunk_ids": [
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "a82198d0-fb43-5d4c-9d0b-e2b8ce23fa2d"
+      ],
+      "retrieved_chunk_ids": [
+        "e91fdc89-ffd7-5b04-ba59-d9374a5ac27b",
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9",
+        "99ebe920-740d-525f-b1e6-52ad55b3fe22",
+        "a82198d0-fb43-5d4c-9d0b-e2b8ce23fa2d",
+        "f0486678-0683-54d0-b7e5-af24ca342577"
+      ],
+      "gold_answer": "FastAPI integrates with Qdrant by declaring a dependency injection for the Qdrant client. In basketball, traveling is a violation where a player walks with the ball without dribbling.",
+      "generated_answer": "insufficient context",
+      "status": "model_refusal",
+      "retries": 0,
+      "cost_usd": 0.00010425,
+      "tokens_used": 686,
+      "latency_ms": 4301.984071731567,
+      "rerank_score": 0.9077567571748706,
+      "metrics": {
+        "recall_1": 0.0,
+        "recall_5": 1.0,
+        "hit_rate_5": 1.0,
+        "mrr": 0.5,
+        "ndcg_5": 0.7328286204777911,
+        "context_precision_5": 0.6388888888888888,
+        "exact_match": 0.0,
+        "f1_score": 0.0,
+        "faithfulness_score": 5,
+        "relevance_score": 5
+      },
+      "judge_explanation": "The answer 'insufficient context' is appropriate because the provided context does not contain any information about the integration of Qdrant and FastAPI for vector search, nor does it provide details on basketball traveling rules. Therefore, the answer is both faithful and relevant, as it accurately reflects the lack of information in the context."
+    },
+    {
+      "id": "q20",
+      "query": "What is the difference between parent-child chunking and hierarchical indexing, and how do you prepare Italian pasta carbonara?",
+      "relevant_chunk_ids": [
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6"
+      ],
+      "retrieved_chunk_ids": [
+        "7f0f8d21-be9e-5efa-abb7-d4c5f766b61f",
+        "df95d549-ead4-57af-baa2-d3d40cb3a8f6",
+        "e91fdc89-ffd7-5b04-ba59-d9374a5ac27b",
+        "f0486678-0683-54d0-b7e5-af24ca342577",
+        "20da95a1-d819-57a5-bbe0-3bfc49e60ab9"
+      ],
+      "gold_answer": "Parent-child chunking uses nested small chunks for search and large chunks for context, while hierarchical indexing structures documents into multi-level nodes. Pasta carbonara is made by boiling spaghetti, frying guanciale, and stirring in egg yolks, Pecorino Romano, and black pepper.",
+      "generated_answer": "Parent-Child Chunking provides a balance between high-fidelity retrieval and complete context, while Hierarchical Indexing structures documents into multi-level nodes [cite: 7f0f8d21-be9e-5efa-abb7-d4c5f766b61f]. \n\nTo prepare traditional Italian pasta carbonara, you should boil spaghetti in salted water, combine the hot drained pasta with the meat, remove from heat, and quickly stir in the egg mixture to create a creamy sauce [cite: df95d549-ead4-57af-baa2-d3d40cb3a8f6].",
+      "status": "success",
+      "retries": 0,
+      "cost_usd": 0.00042734999999999995,
+      "tokens_used": 2276,
+      "latency_ms": 7271.785020828247,
+      "rerank_score": 0.8952483192787982,
+      "metrics": {
+        "recall_1": 0.5,
+        "recall_5": 1.0,
+        "hit_rate_5": 1.0,
+        "mrr": 1.0,
+        "ndcg_5": 1.0,
+        "context_precision_5": 1.0,
+        "exact_match": 0.0,
+        "f1_score": 0.3434343434343435,
+        "faithfulness_score": 5,
+        "relevance_score": 5
+      },
+      "judge_explanation": "The generated answer accurately describes the differences between Parent-Child Chunking and Hierarchical Indexing, both of which are supported by the context. The answer also correctly outlines the preparation steps for Italian pasta carbonara, with each step directly quoted from the context. Therefore, both the faithfulness and relevance scores are high."
     }
   ]
 }
