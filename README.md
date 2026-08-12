@@ -1,12 +1,12 @@
 # Cost-Efficient Agentic RAG QA Service
 
-> 🚀 **Live Demo & API**: [https://agentic-rag-qa-production.up.railway.app](https://agentic-rag-qa-production.up.railway.app)
+> 🚀 **Live Demo**: [https://agentic-rag-qa-production.up.railway.app](https://agentic-rag-qa-production.up.railway.app)
 
-This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant, and **Groq (llama-3.1-8b-instant)**. 
+This repository implements a production-grade, highly cost-optimized **Agentic Retrieval-Augmented Generation (RAG) QA Service** using FastAPI, Qdrant Hybrid Search, **Groq (`llama-3.1-8b-instant`) Generator**, and an **OpenAI (`gpt-4o-mini`) Independent Critic Judge**. 
 
-- **Live URL**: `https://agentic-rag-qa-production.up.railway.app`
-- **Vector Store Chosen**: **Qdrant** (Self-hosted via Docker / Qdrant Cloud).
-- **One-line Why**: Selected Qdrant because it natively supports both dense vectors and FastEmbed sparse BM25 vectors, permitting server-side Reciprocal Rank Fusion (RRF) in a single high-performance API query.
+- **Vector Store**: **Qdrant** (Native dual dense + BM25 sparse hybrid search with server-side Reciprocal Rank Fusion).
+- **Generator Model**: **Groq (`llama-3.1-8b-instant`)** for high-throughput, low-latency grounded generation.
+- **Critic Judge Model**: **OpenAI (`gpt-4o-mini`)** for cross-family factual evaluation (eliminates self-enhancement bias).
 
 Retrieval embedding cost is kept strictly at **$0.00** by generating dense embeddings (`all-MiniLM-L6-v2`) and sparse indices (BM25) locally. Generation cost is optimized via relevance gating (short-circuiting unanswerable questions) and sentence-level context compression.
 
@@ -15,49 +15,55 @@ Retrieval embedding cost is kept strictly at **$0.00** by generating dense embed
 ## 📐 System Architecture Diagram
 
 ```text
-                  [User Input Query]
-                          │
-                  [Query Analyzer]  (gpt-4o-mini structured rewrite, max 1)
-                          │
-                  [Hybrid Search]   (Dense MiniLM + Sparse BM25 via Qdrant RRF)
-                          │
-                [Cross-Encoder Rerank] (ms-marco-MiniLM-L-6-v2)
-                          │
-                  [Relevance Gate]  (Sigmoid score threshold check: 0.001)
-                         / \
-                        /   \
-                 (Passed)   (Failed) ──> [Refusal: insufficient context]
-                      /
-                     /
-           [Context Compressor]     (Sentence-level keyword overlap compression)
-                    │
-           [Grounded Generator]     (Groq llama-3.1-8b-instant with source [cite: chunk_id])
-                    │
-              [Critic Pass]         (Groq llama-3.1-8b-instant structured grounding check)
-                     / \
-                    /   \
-                 (Pass) (Fail) ───> [Regenerate with feedback (Max 1 retry)]
-                  /
-                 /
-          [Final Answer]            (telemetry metrics logged in JSON)
+                  [User Input Query (UI / HTTP POST)]
+                                  │
+                          [Query Analyzer]  (Structured expansion guard, max 1)
+                                  │
+                          [Hybrid Retrieval]
+                 ┌────────────────┴────────────────┐
+          (Dense Vector: 384d)             (Sparse Vector: BM25)
+          [all-MiniLM-L6-v2]              [FastEmbed Qdrant/bm25]
+                 └────────────────┬────────────────┘
+                                  ▼
+                      [Server-Side Qdrant RRF (k=60)]
+                                  │
+                    [Cross-Encoder Local Reranker]
+                     (ms-marco-MiniLM-L-6-v2)
+                                  │
+                         [Relevance Gate] ──(Score < 0.001)──> [Refusal: "insufficient context"]
+                                  │
+                         (Score >= 0.001)
+                                  ▼
+                       [Sentence Context Compressor] (Top query-aligned sentences)
+                                  │
+                       [Grounded Generator] (Groq Llama-3.1-8b with [cite: chunk_id])
+                                  │
+                       [Independent Critic Pass] (OpenAI GPT-4o-mini Grounding Check)
+                             /         \
+                       (Failed)       (Passed)
+                          │               │
+             [1-Time Retry w/ Feedback]   │
+                          └───────────────┤
+                                          ▼
+                                   [Final QA Output] (Answer + Inline Citations + Telemetry)
 ```
 
 ---
 
 ## 🚀 Key Features
 
-- **Local Hybrid Search**: Combines local semantic search (dense SentenceTransformers) and keyword search (Qdrant FastEmbed BM25) fused server-side using **Reciprocal Rank Fusion (RRF)**.
+- **Local Hybrid Search**: Combines local semantic search (dense SentenceTransformers `all-MiniLM-L6-v2`) and keyword search (Qdrant FastEmbed BM25) fused server-side using **Reciprocal Rank Fusion (RRF)**.
 - **Agentic Self-Correction Loop**:
-  - **Query Analyzer**: Automatically rewrites/expands search terms using structured schemas.
+  - **Query Analyzer**: Automatically resolves ambiguous pronouns without hallucinating acronyms.
   - **Cross-Encoder Reranking**: Locally scores relevance using `ms-marco-MiniLM-L-6-v2` mapped to `[0.0, 1.0]` probabilities via a sigmoid function.
-  - **Relevance Gate**: Refuses out-of-domain queries immediately, avoiding LLM generation API costs.
-  - **Contextual Compressor**: Sentence-level keyword overlap extractor reduces token size.
-  - **Critic Pass & Retry**: Cheap critique LLM pass validates groundedness and triggers 1 strict retry on hallucination detection.
+  - **Relevance Gate**: Refuses out-of-domain queries immediately (`score < 0.001`), saving 100% of LLM generation costs.
+  - **Contextual Compressor**: Sentence-level keyword overlap extractor reduces token payload.
+  - **Cross-Model Critic Guardrail**: Independent **OpenAI `gpt-4o-mini`** inspects **Groq Llama 3.1** candidate outputs to eliminate self-enhancement bias, triggering 1 feedback retry on hallucination detection.
 - **Enterprise Security & Telemetry**:
   - **API Header Authentication**: Protects endpoints using header-bound `X-API-Key` checks.
   - **Sliding-Window Rate Limiter**: Thread-safe memory sliding tracker per API key.
   - **Structured JSON Logging**: Custom logger capturing structured event traces and latency metrics.
-  - **Telemetry Endpoints**: Exposes `/metrics` returning uptime, error counts, costs, and latencies.
+  - **Interactive Groundwork UI**: Single-page frontend with drag-and-drop ingestion, 1-click query chips, and "How It Works" modal.
 - **Evaluation Harness**: Automated benchmarking measuring Recall@k, Hit Rate, MRR, nDCG@k, Context Precision, EM, F1, and LLM-as-a-judge faithfulness/relevance scores.
 
 ---
@@ -300,3 +306,12 @@ curl -X POST http://localhost:8000/ingest \
   -H "X-API-Key: rag123" \
   -d '{"directory_path": "./data"}'
 ```
+
+---
+
+## 👤 Author
+
+**Gargi Sharma**  
+- GitHub: [@Gargi3012](https://github.com/Gargi3012)  
+- Project: [Cost-Efficient Agentic RAG QA Service](https://github.com/Gargi3012/agentic-rag-qa)
+

@@ -203,25 +203,35 @@ def compress_context(chunk_text: str, query: str, max_sentences: int = 6) -> str
 
 
 class AgenticQueryPipeline:
-    # Groq model to use for all LLM calls
+    # Generator model: Groq Llama 3.1
     GROQ_MODEL = "llama-3.1-8b-instant"
+    # Judge model: OpenAI GPT-4o-mini
+    JUDGE_MODEL = "gpt-4o-mini"
 
     def __init__(self, store: Optional[QdrantStore] = None):
         self.store = store or QdrantStore()
 
-        # Groq is the primary LLM (OpenAI-compatible API)
+        # 1. Generator LLM: Groq (llama-3.1-8b-instant)
         self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
         if self.groq_api_key:
             self.client = OpenAI(
                 base_url="https://api.groq.com/openai/v1",
                 api_key=self.groq_api_key
             )
-            logger.info("Groq client initialised as primary LLM.")
+            logger.info("Groq client initialised as Generator LLM.")
         else:
             self.client = None
-            logger.warning("GROQ_API_KEY is not configured. LLM calls will be disabled.")
+            logger.warning("GROQ_API_KEY is not configured. Generator calls disabled.")
 
-        # No separate fallback needed — Groq IS the client
+        # 2. Critic Judge LLM: OpenAI (gpt-4o-mini) — Independent model family
+        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if openai_key and not openai_key.startswith("your_"):
+            self.judge_client = OpenAI(api_key=openai_key)
+            logger.info("OpenAI client initialised as Independent Critic Judge (gpt-4o-mini).")
+        else:
+            self.judge_client = None
+            logger.info("OpenAI key not present; Critic will use Groq as fallback.")
+
         self.fallback_client = None
 
     def analyze_query(self, query: str) -> str:
@@ -244,9 +254,10 @@ class AgenticQueryPipeline:
                 "content": (
                     "You are an AI Query Analyzer for an Agentic RAG system. "
                     "Analyze the user's input query. Determine if it needs to be rewritten or expanded "
-                    "to improve dense similarity search and sparse keyword retrieval. "
-                    "For example, resolve vague pronouns, add relevant synonyms, or make implicit needs explicit. "
-                    "Keep the final output concise and direct."
+                    "to improve search retrieval. "
+                    "Only rewrite if the query contains ambiguous pronouns (like 'it', 'this') or missing critical keywords. "
+                    "Do NOT invent or guess fake expansions for technical acronyms (e.g., RAG stands for Retrieval-Augmented Generation). "
+                    "If the query is already clear and specific, set needs_rewrite = false and return the original query."
                 )
             },
             {
@@ -342,7 +353,7 @@ class AgenticQueryPipeline:
         context_str_list = []
         for c in chunks:
             # Compress chunk text
-            compressed_text = compress_context(c["text"], query, max_sentences=3)
+            compressed_text = compress_context(c["text"], query, max_sentences=6)
             context_str_list.append(
                 f"--- \n"
                 f"Chunk ID: {c['id']}\n"
@@ -364,10 +375,9 @@ class AgenticQueryPipeline:
         
         if strict_mode:
             system_instruction += (
-                "\n\nCRITICAL WARNING: Your previous attempt was flagged by the critic for not being fully grounded. "
-                "You MUST adhere strictly to the context. Do NOT make claims that aren't explicit. "
-                "Here is the critic feedback from your last attempt:\n"
-                f"{critic_feedback}"
+                "\n\nFEEDBACK FROM CRITIC: Your previous attempt had unsupported statements:\n"
+                f"{critic_feedback}\n"
+                "Please generate a revised, clean, and fully grounded response answering the query using ONLY facts supported by the Context and cited with [cite: chunk_id]."
             )
 
         messages = [
@@ -407,12 +417,12 @@ class AgenticQueryPipeline:
 
         system_instruction = (
             "You are an AI Critic evaluating groundedness for a RAG QA system. "
-            "Evaluate if the candidate answer is fully supported by and grounded in the provided Context. "
+            "Evaluate if the candidate answer is accurately supported by the provided Context chunks. "
             "Check for:\n"
-            "1. Statements in the answer not backed by the context (hallucinations).\n"
-            "2. Failure to use the exact [cite: chunk_id] tag when stating facts.\n"
-            "If the candidate answer says 'insufficient context', it is considered grounded (is_grounded = True).\n"
-            "Be strict. If any part of the answer is unsupported, set is_grounded to False."
+            "1. Completely unsupported claims or hallucinations not present in the context.\n"
+            "2. If the core facts in the answer are present in the context and accompanied by [cite: chunk_id] citations, set is_grounded to True.\n"
+            "3. If the candidate answer says 'insufficient context', set is_grounded to True.\n"
+            "Only set is_grounded to False if the answer asserts clear falsehoods or claims missing from the context."
         )
 
         user_content = (
@@ -427,12 +437,16 @@ class AgenticQueryPipeline:
         ]
 
         try:
-            logger.info("Running Critic Pass check on the candidate answer...")
+            # Cross-model evaluation: Use OpenAI (gpt-4o-mini) as Judge if available, otherwise Groq
+            active_critic_client = self.judge_client or self.client
+            active_critic_model = self.JUDGE_MODEL if self.judge_client else self.GROQ_MODEL
+            logger.info(f"Running Critic Pass using {active_critic_model}...")
+
             completion = call_llm_with_backoff(
-                client=self.client,
+                client=active_critic_client,
                 messages=messages,
                 response_format=CriticCheck,
-                model=self.GROQ_MODEL,
+                model=active_critic_model,
                 temperature=0.0,
                 fallback_client=self.fallback_client
             )
@@ -494,9 +508,9 @@ class AgenticQueryPipeline:
                 "rerank_score": best_rerank_score
             }
 
-        # 5 & 6. Grounded Generation
+        # 5 & 6. Grounded Generation — Answer the user's actual question
         # Initial Attempt
-        answer, p_tokens, c_tokens = self.generate_grounded_answer(rewritten_query, reranked_chunks)
+        answer, p_tokens, c_tokens = self.generate_grounded_answer(query_text, reranked_chunks)
         total_prompt_tokens += p_tokens
         total_completion_tokens += c_tokens
         
@@ -523,19 +537,19 @@ class AgenticQueryPipeline:
                 "rerank_score": best_rerank_score
             }
 
-        # 7. Critic Pass
-        critic_check, cp_p_tokens, cp_c_tokens = self.run_critic_pass(rewritten_query, answer, reranked_chunks)
+        # 7. Critic Pass — Validate grounding on original user query
+        critic_check, cp_p_tokens, cp_c_tokens = self.run_critic_pass(query_text, answer, reranked_chunks)
         total_prompt_tokens += cp_p_tokens
         total_completion_tokens += cp_c_tokens
         
         # If Critic fails, regenerate once
         if not critic_check.is_grounded:
-            logger.warning("Critic pass failed. Triggering strict generation retry...")
+            logger.warning(f"Critic pass failed: {critic_check.reason}. Triggering strict generation retry...")
             retries_count += 1
             
             # Second attempt with feedback
             answer, p_tokens, c_tokens = self.generate_grounded_answer(
-                query=rewritten_query,
+                query=query_text,
                 chunks=reranked_chunks,
                 strict_mode=True,
                 critic_feedback=critic_check.reason
@@ -544,7 +558,7 @@ class AgenticQueryPipeline:
             total_completion_tokens += c_tokens
             
             # Run final critic pass on retry
-            critic_check, cp_p_tokens, cp_c_tokens = self.run_critic_pass(rewritten_query, answer, reranked_chunks)
+            critic_check, cp_p_tokens, cp_c_tokens = self.run_critic_pass(query_text, answer, reranked_chunks)
             total_prompt_tokens += cp_p_tokens
             total_completion_tokens += cp_c_tokens
             

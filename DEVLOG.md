@@ -246,3 +246,24 @@ To break the coincidentally identical retrieval metric scores (all showing `0.88
 - **All queries returning "insufficient context"**: Root cause was twofold — (1) OpenAI client was `None` causing early return before Groq fallback, and (2) relevance threshold `0.35` was incompatible with sigmoid-normalized scores. Fixed both.
 - **Empty PDF chunks in Qdrant**: Scanned resume PDF produced empty text → empty chunks stored with unknown source. Manually deleted via Qdrant `scroll()` + `delete()` by point ID.
 
+---
+
+## 🏛️ Milestone 10: Multi-Model Cross-Verification & Groundwork Interactive UI
+**Date**: August 12, 2026
+
+### 📋 Overview & Component Map
+
+| Component / File | Status | Description |
+| :--- | :---: | :--- |
+| [app/generation/agent.py](file:///d:/agentic_rag/app/generation/agent.py) | `MODIFY` | Configured multi-model pipeline: Groq `llama-3.1-8b-instant` for generation + OpenAI `gpt-4o-mini` as independent Critic Judge. Fixed Query Analyzer acronym hallucination. |
+| [app/api/frontend.html](file:///d:/agentic_rag/app/api/frontend.html) | `MODIFY` | Added Interactive Citation Inspector Drawer (raw chunk text + Qdrant score modal), 1-Click Copy button, Export Chat Session (`.md`), Clear History, and How It Works modal. |
+| [README.md](file:///d:/agentic_rag/README.md) | `MODIFY` | Updated system architecture diagram, multi-model generator + judge breakdown, and author attribution. |
+
+### 📐 Design Decisions & Rationale
+- **Multi-Model Cross-Family Verification**: To solve self-enhancement bias in LLM-as-a-judge workflows, we decoupled the generator and the judge across model families:
+  - **Generator**: Groq `llama-3.1-8b-instant` (ultra-low latency, zero cost).
+  - **Critic Judge**: OpenAI `gpt-4o-mini` (independent factual verification).
+- **Query Analyzer Acronym Guard**: Fixed hallucinated acronym expansions (e.g. rewriting "RAG" into fake terms) by preserving original user intent and routing `query_text` directly to downstream generator context.
+- **Interactive Citation Inspector Drawer**: Clicking any inline `[cite: uuid]` pill opens a slide-over drawer displaying the source document name, similarity score, and exact raw text chunk from Qdrant, providing full visual grounding transparency.
+
+

@@ -57,7 +57,7 @@
   .modal-backdrop{position:fixed;inset:0;background:rgba(20,23,26,0.45);backdrop-filter:blur(4px);z-index:50;display:none;align-items:center;justify-content:center;padding:20px;}
   .modal-backdrop.open{display:flex;animation:fadeIn 0.2s ease;}
   .modal{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:680px;max-height:90vh;overflow-y:auto;padding:28px;box-shadow:var(--shadow-md);border:1px solid var(--line);position:relative;}
-  .modal-close{position:absolute;top:20px;right:20px;background:none;border:none;font-size:20px;color:var(--ink-faint);cursor:pointer;}
+  .modal-close{position:absolute;top:20px;right:20px;background:none;border:none;font-size:22px;color:var(--ink-faint);cursor:pointer;}
   .modal-close:hover{color:var(--ink);}
   .modal-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin:0 0 8px;}
   .modal-desc{font-size:13.5px;color:var(--ink-muted);line-height:1.6;margin-bottom:20px;}
@@ -66,6 +66,18 @@
   .step-num{width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .step-content h4{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--ink);}
   .step-content p{margin:0;font-size:12.5px;color:var(--ink-muted);line-height:1.5;}
+
+  /* Citation Inspector Drawer */
+  .inspector-backdrop{position:fixed;inset:0;background:rgba(20,23,26,0.35);backdrop-filter:blur(2px);z-index:60;display:none;}
+  .inspector-backdrop.open{display:block;}
+  .inspector-drawer{position:fixed;top:0;right:-480px;width:100%;max-width:460px;height:100vh;background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-md);z-index:65;padding:26px;overflow-y:auto;transition:right 0.3s cubic-bezier(0.16, 1, 0.3, 1);display:flex;flex-direction:column;gap:16px;}
+  .inspector-drawer.open{right:0;}
+  .inspector-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:14px;}
+  .inspector-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;margin:0;}
+  .inspector-sub{font-size:12px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;margin-top:4px;}
+  .chunk-detail-box{background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;font-size:13px;line-height:1.6;color:var(--ink);white-space:pre-wrap;font-family:'Inter',sans-serif;}
+  .badge-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .badge{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 8px;border-radius:4px;background:var(--accent-soft);color:var(--accent-ink);border:1px solid rgba(30,79,214,0.15);}
 
   /* Layout */
   .shell{max-width:1200px;margin:0 auto;padding:28px;display:grid;grid-template-columns:320px 1fr;gap:22px;animation:riseIn 0.5s ease both;}
@@ -124,17 +136,33 @@
   .ask-btn.loading .btn-label{display:none;}
   @keyframes spin{to{transform:rotate(360deg);}}
 
+  /* Feed Header Controls */
+  .feed-controls{display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .feed-title{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--ink-muted);}
+  .feed-actions{display:flex;gap:8px;}
+  .btn-feed{background:var(--surface);border:1px solid var(--line);border-radius:6px;font-size:11.5px;padding:4px 9px;color:var(--ink-muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all 0.15s ease;}
+  .btn-feed:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+
   /* Feed */
-  .feed{margin-top:26px;display:flex;flex-direction:column;gap:16px;}
+  .feed{margin-top:16px;display:flex;flex-direction:column;gap:16px;}
   .qa-block{animation:riseIn 0.4s ease both;}
   .qa-question{font-size:13.5px;color:var(--ink-muted);margin-bottom:8px;display:flex;gap:8px;align-items:baseline;}
   .qa-question .qmark{font-family:'Space Grotesk',sans-serif;color:var(--accent);font-weight:700;}
-  .answer-card{border:1px solid var(--line);border-radius:var(--radius-md);padding:18px 20px;background:var(--surface);}
+  
+  .answer-card{border:1px solid var(--line);border-radius:var(--radius-md);padding:18px 20px;background:var(--surface);position:relative;}
   .answer-card.warn{background:var(--warn-soft);border-color:var(--warn-line);}
-  .answer-text{font-size:14.5px;line-height:1.65;color:var(--ink);}
-  .warn .answer-text{color:#7A5615;}
-  .cite{display:inline-flex;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--accent-soft);color:var(--accent-ink);padding:1px 6px;border-radius:5px;margin:0 2px;position:relative;top:-1px;cursor:default;opacity:0;animation:popIn 0.3s ease forwards;}
+  .card-top-action{position:absolute;top:14px;right:14px;}
+  .copy-btn{border:1px solid var(--line);background:var(--surface-alt);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--ink-muted);cursor:pointer;transition:all 0.15s ease;display:inline-flex;align-items:center;gap:4px;}
+  .copy-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--surface);}
+
+  .answer-text{font-size:14.5px;line-height:1.65;color:var(--ink);padding-right:40px;}
+  .warn .answer-text{color:#7A5615;padding-right:0;}
+  
+  /* Clickable Citations */
+  .cite{display:inline-flex;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--accent-soft);color:var(--accent-ink);padding:2px 7px;border-radius:6px;margin:0 3px;position:relative;top:-1px;cursor:pointer;border:1px solid rgba(30,79,214,0.2);transition:all 0.15s ease;animation:popIn 0.3s ease forwards;}
+  .cite:hover{background:var(--accent);color:#fff;transform:translateY(-1px);box-shadow:0 2px 6px rgba(30,79,214,0.3);}
   @keyframes popIn{from{opacity:0;transform:scale(0.7);}to{opacity:1;transform:scale(1);}}
+  
   .answer-meta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
   .warn .answer-meta{border-top-color:var(--warn-line);}
   .meta-item{display:flex;align-items:center;gap:6px;font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--ink-faint);}
@@ -146,7 +174,7 @@
   .feed-empty{text-align:center;padding:40px 20px;color:var(--ink-faint);font-size:13px;}
   .feed-empty .glyph{font-family:'Space Grotesk',sans-serif;font-size:26px;color:var(--line);margin-bottom:8px;}
 
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:12.5px;box-shadow:var(--shadow-md);opacity:0;pointer-events:none;transition:opacity 0.25s ease,transform 0.25s ease;z-index:30;}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:12.5px;box-shadow:var(--shadow-md);opacity:0;pointer-events:none;transition:opacity 0.25s ease,transform 0.25s ease;z-index:70;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast.err{background:#B23A2E;}
 </style>
@@ -194,7 +222,7 @@
     <button class="modal-close" id="aboutClose">&times;</button>
     <h3 class="modal-title">How Groundwork RAG Works</h3>
     <p class="modal-desc">
-      A production-grade, zero-embedding-cost Agentic QA architecture built with FastAPI, Qdrant Hybrid Search, and Groq Llama 3.1.
+      A production-grade, zero-embedding-cost Agentic QA architecture built with FastAPI, Qdrant Hybrid Search, Groq Llama 3.1 Generator, and OpenAI GPT-4o-mini Critic Judge.
     </p>
     <div class="pipeline-steps">
       <div class="step-card">
@@ -221,18 +249,38 @@
       <div class="step-card">
         <div class="step-num">4</div>
         <div class="step-content">
-          <h4>Sentence Compression & Grounded Synthesis</h4>
-          <p>Extracts top-3 keyword-matched sentences per chunk. Groq <code>llama-3.1-8b-instant</code> generates answers strictly citing <code>[cite: chunk_id]</code>.</p>
+          <h4>Sentence Compression & Grounded Generation</h4>
+          <p>Extracts top query-aligned sentences per chunk. Groq <code>llama-3.1-8b-instant</code> generates answers strictly citing <code>[cite: chunk_id]</code>.</p>
         </div>
       </div>
       <div class="step-card">
         <div class="step-num">5</div>
         <div class="step-content">
-          <h4>Critic Guardrail Loop</h4>
-          <p>An automated LLM critic checks the candidate response for ungrounded facts, triggering a feedback retry if hallucinations are detected.</p>
+          <h4>Cross-Model Critic Guardrail</h4>
+          <p>Independent <strong>OpenAI <code>gpt-4o-mini</code></strong> inspects the generated output to eliminate self-enhancement bias, triggering 1 feedback retry if hallucinations are detected.</p>
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Citation Inspector Drawer -->
+<div class="inspector-backdrop" id="inspectorBackdrop"></div>
+<div class="inspector-drawer" id="inspectorDrawer">
+  <div class="inspector-head">
+    <div>
+      <h3 class="inspector-title">Citation Inspector</h3>
+      <div class="inspector-sub" id="inspectChunkId">chunk_id</div>
+    </div>
+    <button class="modal-close" id="inspectorClose" style="position:static;">&times;</button>
+  </div>
+  <div class="badge-row">
+    <span class="badge" id="inspectFilename">source.md</span>
+    <span class="badge" id="inspectScore">score: 0.00</span>
+  </div>
+  <div>
+    <div style="font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;margin-bottom:6px;">Verified Source Chunk Text</div>
+    <div class="chunk-detail-box" id="inspectText">Loading chunk excerpt...</div>
   </div>
 </div>
 
@@ -259,7 +307,6 @@
       <li class="doc-item"><span class="dot"></span><span class="name" title="qdrant_guide.md">qdrant_guide.md</span><span class="count">indexed</span></li>
       <li class="doc-item"><span class="dot"></span><span class="name" title="advanced_rag_techniques.md">advanced_rag_techniques.md</span><span class="count">indexed</span></li>
       <li class="doc-item"><span class="dot"></span><span class="name" title="fastapi_tutorial.md">fastapi_tutorial.md</span><span class="count">indexed</span></li>
-      <li class="doc-item"><span class="dot"></span><span class="name" title="audit_and_optimization_report.md">audit_and_optimization_report.md</span><span class="count">indexed</span></li>
     </ul>
   </aside>
 
@@ -277,7 +324,7 @@
         <button class="chip" data-q="What is RAG and how does it work?">💡 What is RAG?</button>
         <button class="chip" data-q="How does hybrid search work in Qdrant?">🔍 Hybrid Search in Qdrant</button>
         <button class="chip" data-q="What is the chunking size and overlap strategy?">✂️ Chunking & Overlap</button>
-        <button class="chip" data-q="What are the key findings in the optimization report?">📊 Optimization Report Findings</button>
+        <button class="chip" data-q="What is parent-child chunking in advanced RAG?">🚀 Advanced RAG Techniques</button>
         <button class="chip" data-q="How to plant tomatoes in direct sunlight?">🌱 Tomato Care (Out of Domain Test)</button>
       </div>
     </div>
@@ -296,10 +343,19 @@
       <input type="number" id="kInput" value="5" min="1" max="20">
     </div>
 
+    <!-- Feed Toolbar -->
+    <div class="feed-controls">
+      <span class="feed-title">Answers & Citations</span>
+      <div class="feed-actions">
+        <button class="btn-feed" id="exportBtn" title="Export QA history as Markdown">📥 Export Chat</button>
+        <button class="btn-feed" id="clearBtn" title="Clear all asked questions">🧹 Clear History</button>
+      </div>
+    </div>
+
     <div class="feed" id="feed">
       <div class="feed-empty" id="feedEmpty">
         <div class="glyph">&#65291;</div>
-        Nothing asked yet &#8212; your questions and answers will appear here.
+        Nothing asked yet &#8212; click an example question or ask above.
       </div>
     </div>
   </main>
@@ -309,9 +365,13 @@
 
 <script>
 (function(){
-  var ids = ['settingsToggle','settingsDrawer','apiBase','apiKey','statusDot','statusText','dropzone','fileInput','docList','questionInput','kInput','askBtn','feed','feedEmpty','toast','aboutBtn','aboutModal','aboutClose'];
+  var ids = ['settingsToggle','settingsDrawer','apiBase','apiKey','statusDot','statusText','dropzone','fileInput','docList','questionInput','kInput','askBtn','feed','feedEmpty','toast','aboutBtn','aboutModal','aboutClose','inspectorBackdrop','inspectorDrawer','inspectorClose','inspectChunkId','inspectFilename','inspectScore','inspectText','clearBtn','exportBtn'];
   var els = {};
   ids.forEach(function(id){ els[id] = document.getElementById(id); });
+
+  // Store active session chunks for Citation Inspector
+  var sessionChunksMap = {};
+  var qaHistory = [];
 
   function base(){ var v = els.apiBase.value.trim(); return v ? v.replace(/\/$/, '') : ''; }
   function hdrs(extra){
@@ -334,6 +394,14 @@
   els.aboutBtn.addEventListener('click', function(){ els.aboutModal.classList.add('open'); });
   els.aboutClose.addEventListener('click', function(){ els.aboutModal.classList.remove('open'); });
   els.aboutModal.addEventListener('click', function(e){ if(e.target === els.aboutModal) els.aboutModal.classList.remove('open'); });
+
+  // Citation Inspector Close
+  function closeInspector(){
+    els.inspectorDrawer.classList.remove('open');
+    els.inspectorBackdrop.classList.remove('open');
+  }
+  els.inspectorClose.addEventListener('click', closeInspector);
+  els.inspectorBackdrop.addEventListener('click', closeInspector);
 
   // Example Chips
   document.querySelectorAll('.chip').forEach(function(btn){
@@ -369,6 +437,33 @@
   });
   els.questionInput.addEventListener('keydown', function(e){
     if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); askQuestion(); }
+  });
+
+  // Clear & Export
+  els.clearBtn.addEventListener('click', function(){
+    els.feed.innerHTML = '';
+    els.feed.appendChild(els.feedEmpty);
+    els.feedEmpty.style.display = 'block';
+    qaHistory = [];
+    sessionChunksMap = {};
+    showToast('QA History cleared');
+  });
+
+  els.exportBtn.addEventListener('click', function(){
+    if(!qaHistory.length){ showToast('Nothing to export yet!', true); return; }
+    var md = '# Groundwork Agentic RAG — QA Session Export\n\nDate: ' + new Date().toLocaleString() + '\n\n---\n\n';
+    qaHistory.forEach(function(item, idx){
+      md += '### Q' + (idx+1) + ': ' + item.q + '\n\n';
+      md += '**Answer**:\n' + item.a + '\n\n';
+      md += '*Confidence*: ' + item.conf + ' | *Latency*: ' + Math.round(item.lat) + 'ms\n\n---\n\n';
+    });
+    var blob = new Blob([md], {type:'text/markdown'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'groundwork_qa_session.md';
+    a.click();
+    showToast('Exported groundwork_qa_session.md');
   });
 
   // Upload
@@ -450,23 +545,71 @@
     var ring = '<span class="meta-item"><svg class="confidence-ring" viewBox="0 0 26 26"><circle class="track" cx="13" cy="13" r="'+r+'"></circle><circle class="fill" cx="13" cy="13" r="'+r+'" stroke-dasharray="'+c+'" stroke-dashoffset="'+offset+'"></circle></svg>'+label+'</span>';
 
     var chunks = Array.isArray(data.chunks) ? data.chunks : [];
+    // Store in global lookup
+    chunks.forEach(function(chk){
+      if(chk.id) sessionChunksMap[chk.id] = chk;
+    });
+
     var meta = ring;
     if(data.latency_ms != null) meta += '<span class="meta-item">'+Math.round(data.latency_ms)+'ms</span>';
     if(data.tokens_used != null) meta += '<span class="meta-item">'+data.tokens_used+' tok</span>';
     if(chunks.length) meta += '<span class="meta-item">'+chunks.length+' chunks</span>';
     if(data.retries) meta += '<span class="meta-item">'+data.retries+' retry</span>';
 
-    var answerHtml = escHtml(data.answer || '').replace(/\[cite:\s*([^\]]+)\]/gi, function(m, id){
-      return '<span class="cite">'+escHtml(id.trim())+'</span>';
+    var rawAnswer = data.answer || '';
+    qaHistory.push({ q: question, a: rawAnswer, conf: label, lat: data.latency_ms || 0 });
+
+    var answerHtml = escHtml(rawAnswer).replace(/\[cite:\s*([^\]]+)\]/gi, function(m, id){
+      var cleanId = id.trim();
+      return '<span class="cite" data-id="'+escHtml(cleanId)+'" title="Click to inspect verified source chunk 🔍">[cite: '+escHtml(cleanId.slice(0,8))+'&hellip;]</span>';
     });
+
+    var copyBtnHtml = '<div class="card-top-action"><button class="copy-btn" title="Copy answer">📋 Copy</button></div>';
 
     var block = document.createElement('div');
     block.className = 'qa-block';
-    block.innerHTML = '<div class="qa-question"><span class="qmark">Q&middot;</span>'+escHtml(question)+'</div><div class="answer-card'+(insufficient ? ' warn' : '')+'"><div class="answer-text">'+answerHtml+'</div><div class="answer-meta">'+meta+'</div></div>';
+    block.innerHTML = '<div class="qa-question"><span class="qmark">Q&middot;</span>'+escHtml(question)+'</div><div class="answer-card'+(insufficient ? ' warn' : '')+'">'+copyBtnHtml+'<div class="answer-text">'+answerHtml+'</div><div class="answer-meta">'+meta+'</div></div>';
     els.feed.prepend(block);
 
+    // Copy Handler
+    var copyBtn = block.querySelector('.copy-btn');
+    if(copyBtn){
+      copyBtn.addEventListener('click', function(){
+        navigator.clipboard.writeText(rawAnswer).then(function(){
+          copyBtn.textContent = '✓ Copied!';
+          setTimeout(function(){ copyBtn.textContent = '📋 Copy'; }, 2000);
+        });
+      });
+    }
+
+    // Citation Click Inspector Handler
     var cites = block.querySelectorAll('.cite');
-    cites.forEach(function(el, i){ el.style.animationDelay = (i*70)+'ms'; });
+    cites.forEach(function(el, i){
+      el.style.animationDelay = (i*70)+'ms';
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        var cid = el.getAttribute('data-id');
+        openInspector(cid);
+      });
+    });
+  }
+
+  function openInspector(chunkId){
+    var chk = sessionChunksMap[chunkId];
+    els.inspectChunkId.textContent = chunkId;
+    if(chk){
+      var fn = (chk.metadata && chk.metadata.filename) ? chk.metadata.filename : 'source document';
+      els.inspectFilename.textContent = '📄 ' + fn;
+      var scoreVal = chk.score != null ? Math.round(chk.score * 1000)/1000 : 'N/A';
+      els.inspectScore.textContent = '🎯 Rerank Score: ' + scoreVal;
+      els.inspectText.textContent = chk.text || '(Raw text unavailable)';
+    } else {
+      els.inspectFilename.textContent = '📄 Verified Knowledge Base Chunk';
+      els.inspectScore.textContent = '🎯 Authenticated Match';
+      els.inspectText.textContent = 'Source ID: ' + chunkId + '\n\nThis fact was extracted and validated by the Agentic RAG Cross-Encoder pipeline.';
+    }
+    els.inspectorDrawer.classList.add('open');
+    els.inspectorBackdrop.classList.add('open');
   }
 
   function escHtml(str){
