@@ -1,8 +1,13 @@
 import time
 import logging
+import os
+import shutil
+import tempfile
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, Depends, Security, HTTPException, status
+from fastapi import FastAPI, Depends, Security, HTTPException, status, UploadFile, File
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from app.api.frontend_html import get_frontend_html
 
 from app.config import Config
 from app.api.auth import get_api_key
@@ -72,6 +77,7 @@ class IngestResponse(BaseModel):
 class QueryRequest(BaseModel):
     query: str = Field(..., description="The question to ask the agentic RAG system.")
     metadata_filter: Optional[Dict[str, Any]] = Field(None, description="Optional key-value filters matching document metadata.")
+    k: Optional[int] = Field(5, description="Number of chunks to retrieve.")
 
 class ChunkDetail(BaseModel):
     id: str
@@ -253,3 +259,73 @@ def get_system_metrics(api_key: str = Security(get_api_key)):
         total_cost_usd=metrics_tracker.total_cost,
         query_history=metrics_tracker.history
     )
+
+@app.get("/", response_class=HTMLResponse, tags=["Frontend"])
+def get_frontend():
+    """
+    Serves the Groundwork single-page frontend.
+    """
+    return HTMLResponse(content=get_frontend_html(), status_code=200)
+
+@app.post("/ingest_file", tags=["Ingestion"])
+def ingest_single_file(
+    file: UploadFile = File(...),
+    api_key: str = Security(rate_limit_dependency)
+):
+    """
+    Ingests a single uploaded file (PDF, HTML, MD) directly.
+    """
+    t_start = time.time()
+    try:
+        # Save file to a temporary file
+        suffix = os.path.splitext(file.filename)[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+            
+        # Extract filename
+        original_filename = file.filename
+        
+        # Load the single file using loader
+        from app.ingestion.loader import load_file
+        doc = load_file(tmp_path)
+        
+        # Clean up temporary file
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+            
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported or unparseable file format: {original_filename}"
+            )
+            
+        # Restore original filename in metadata
+        doc.metadata["filename"] = original_filename
+        doc.metadata["file_path"] = f"uploads/{original_filename}"
+        
+        # Chunk
+        chunks = chunk_document(doc, chunk_size=Config.CHUNK_SIZE, chunk_overlap=Config.CHUNK_OVERLAP)
+        
+        # Deduplicate
+        unique_chunks = deduplicate_chunks(chunks)
+        
+        # Upsert
+        chunks_upserted = store.upsert_chunks(unique_chunks)
+        
+        # Return count
+        return {
+            "status": "success",
+            "filename": original_filename,
+            "chunks_added": chunks_upserted,
+            "chunks_skipped": len(unique_chunks) - chunks_upserted,
+            "time_taken_seconds": time.time() - t_start
+        }
+    except Exception as e:
+        logger.error(f"File ingestion failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ingestion error: {str(e)}"
+        )
