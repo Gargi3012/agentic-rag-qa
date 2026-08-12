@@ -26,7 +26,8 @@ def _groq_style_structured_call(client, messages, response_format, **kwargs):
     """Structured call using json_object mode — Groq and OpenAI compatible."""
     model = kwargs.get("model", "llama-3.1-8b-instant")
     msgs = list(messages)
-    hint = "IMPORTANT: Return ONLY a valid JSON object matching the requested schema."
+    schema_desc = json.dumps(response_format.model_json_schema())
+    hint = f"IMPORTANT: Return ONLY a valid JSON object strictly adhering to this schema:\n{schema_desc}"
     if msgs and msgs[0]["role"] == "system":
         msgs[0] = {"role": "system", "content": msgs[0]["content"] + "\n\n" + hint}
     logger.info(f"Calling LLM with json_object mode (model={model})...")
@@ -35,7 +36,17 @@ def _groq_style_structured_call(client, messages, response_format, **kwargs):
         response_format={"type": "json_object"}, timeout=15.0
     )
     content = response.choices[0].message.content
-    parsed_obj = response_format.model_validate(json.loads(content))
+    try:
+        data = json.loads(content)
+        if isinstance(data, dict):
+            for k in list(data.keys()):
+                if isinstance(data[k], dict) and all(f in data[k] for f in response_format.model_fields):
+                    data = data[k]
+                    break
+        parsed_obj = response_format.model_validate(data)
+    except Exception:
+        raw_data = json.loads(content) if (content and content.startswith('{')) else {}
+        parsed_obj = response_format.model_construct(**(raw_data if isinstance(raw_data, dict) else {}))
     p = getattr(response.usage, "prompt_tokens", 0) if response.usage else 0
     c = getattr(response.usage, "completion_tokens", 0) if response.usage else 0
 
@@ -165,34 +176,28 @@ def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], respon
 
 import re
 
-def compress_context(chunk_text: str, query: str, max_sentences: int = 3) -> str:
+def compress_context(chunk_text: str, query: str, max_sentences: int = 6) -> str:
     """
     Trims a text chunk to only the most relevant sentences.
     Computes a keyword overlap score between the query terms and sentences.
     """
-    query_words = set(query.lower().split())
-    # Basic stop words to ignore in keyword matching
-    stop_words = {"what", "is", "the", "how", "does", "to", "in", "a", "an", "and", "of", "for", "on", "with", "about", "by", "why", "are", "you", "i"}
-    query_keywords = query_words - stop_words
-    if not query_keywords:
-        query_keywords = query_words
-        
-    # Split text into sentences using simple regex
     sentences = re.split(r'(?<=[.!?])\s+', chunk_text.strip())
     if len(sentences) <= max_sentences:
         return chunk_text
-        
+
+    query_words = set(query.lower().split())
+    stop_words = {"what", "is", "the", "how", "does", "to", "in", "a", "an", "and", "of", "for", "on", "with", "about", "by", "why", "are", "you", "i", "it"}
+    query_keywords = query_words - stop_words
+    if not query_keywords:
+        query_keywords = query_words
+
     scored_sentences = []
     for idx, sent in enumerate(sentences):
-        # Basic word matching score
         sent_words = set(sent.lower().split())
         overlap = len(query_keywords.intersection(sent_words))
         scored_sentences.append((overlap, idx, sent))
-        
-    # Sort by overlap score descending, then by original index ascending
+
     scored_sentences.sort(key=lambda x: (-x[0], x[1]))
-    
-    # Select top sentences
     top_selections = sorted(scored_sentences[:max_sentences], key=lambda x: x[1])
     return " ".join(t[2] for t in top_selections)
 
@@ -348,10 +353,10 @@ class AgenticQueryPipeline:
         context_block = "\n\n".join(context_str_list)
 
         system_instruction = (
-            "You are a highly factual QA system. Answer the User Query based ONLY on the provided Context. "
-            "For any fact you state, you MUST cite the source chunk using the exact format [cite: chunk_id] where chunk_id is the exact ID provided in the context. "
-            "Do not state any fact that is not directly supported by the Context. "
-            "If the provided Context is insufficient to answer the query, refuse to answer and return 'insufficient context' exactly. "
+            "You are a highly factual QA system. Answer the User Query based strictly on the provided Context. "
+            "For every fact you state, cite the source chunk using the exact format [cite: chunk_id]. "
+            "If the Context contains information to answer the question, provide a clear, accurate, and comprehensive answer. "
+            "Only return 'insufficient context' if the Context contains absolutely NO information relevant to the user query. "
             "Do not use outside knowledge or extrapolate."
         )
 
