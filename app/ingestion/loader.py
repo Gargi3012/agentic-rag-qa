@@ -1,4 +1,5 @@
 import os
+import base64
 import mimetypes
 import logging
 from typing import List, Dict, Any, Optional
@@ -110,6 +111,41 @@ def _extract_with_pdfplumber(file_path: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"pdfplumber also failed for {file_path}: {e}")
         return None
+
+
+def extract_images_from_pdf(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Extracts embedded images from a PDF using PyMuPDF (pure Python).
+    Returns list of dicts: {page, img_index, bytes, ext}.
+    Skips tiny images (< 5 KB) which are likely icons or decorations.
+    """
+    images = []
+    try:
+        doc = pymupdf.open(file_path)
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            for img_idx, img_ref in enumerate(page.get_images(full=True)):
+                xref = img_ref[0]
+                base_image = doc.extract_image(xref)
+                img_bytes = base_image["image"]
+                ext = base_image["ext"]
+                if len(img_bytes) < 5120:   # skip tiny icons/bullets
+                    continue
+                images.append({
+                    "page": page_num + 1,
+                    "img_index": img_idx,
+                    "bytes": img_bytes,
+                    "ext": ext,
+                })
+        logger.info(f"Extracted {len(images)} meaningful images from {file_path}")
+    except Exception as e:
+        logger.warning(f"Image extraction failed for {file_path}: {e}")
+    return images
+
+
+def image_bytes_to_base64(img_bytes: bytes) -> str:
+    """Returns base64 string for an image -- used by multimodal LLM vision calls."""
+    return base64.b64encode(img_bytes).decode("utf-8")
 
 
 def _ocr_page_image(pil_image) -> str:
@@ -264,6 +300,23 @@ def load_file(file_path: str) -> List[Document]:
                     "content_type": "table",
                     "table_page": tbl["page"],
                     "table_index": tbl["table_index"],
+                }
+            ))
+
+        # 3. Images as individual Documents (base64-encoded for vision LLM calls)
+        images = extract_images_from_pdf(file_path)
+        for img in images:
+            b64 = image_bytes_to_base64(img["bytes"])
+            documents.append(Document(
+                text=f"[IMAGE -- Page {img['page']}, Index {img['img_index']}] (awaiting vision description)",
+                metadata={
+                    **base_metadata,
+                    "file_type": "pdf",
+                    "content_type": "image",
+                    "image_page": img["page"],
+                    "image_index": img["img_index"],
+                    "image_ext": img["ext"],
+                    "image_b64": b64,
                 }
             ))
 
