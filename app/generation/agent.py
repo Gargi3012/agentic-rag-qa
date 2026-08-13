@@ -176,6 +176,25 @@ def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], respon
 
 import re
 
+
+def compute_confidence_score(
+    rerank_score: float,
+    critic_grounded: bool,
+    retries: int,
+) -> float:
+    """
+    Computes a composite confidence score in [0.0, 1.0].
+
+    Formula:
+        0.40 × rerank_score    — how relevant retrieved chunks are
+      + 0.40 × grounding_score — 1.0 if grounded, 0.5 if passed after retry, 0.0 if failed
+      + 0.20 × retry_penalty   — 1.0 if no retries, 0.0 if 1 retry needed
+    """
+    grounding_score = 1.0 if (critic_grounded and retries == 0) else (0.5 if critic_grounded else 0.0)
+    retry_penalty = 1.0 if retries == 0 else 0.0
+    score = (0.40 * rerank_score) + (0.40 * grounding_score) + (0.20 * retry_penalty)
+    return round(min(max(score, 0.0), 1.0), 4)
+
 def compress_context(chunk_text: str, query: str, max_sentences: int = 6) -> str:
     """
     Trims a text chunk to only the most relevant sentences.
@@ -571,7 +590,13 @@ class AgenticQueryPipeline:
         # Compute cost
         cost = (total_prompt_tokens * 0.00000015) + (total_completion_tokens * 0.00000060)
         latency = (time.time() - start_time) * 1000
-        
+
+        confidence_score = compute_confidence_score(
+            rerank_score=best_rerank_score,
+            critic_grounded=critic_check.is_grounded,
+            retries=retries_count,
+        )
+
         return {
             "answer": answer,
             "chunks": [
@@ -583,6 +608,7 @@ class AgenticQueryPipeline:
                 } for c in reranked_chunks
             ],
             "confidence": confidence,
+            "confidence_score": confidence_score,
             "retries": retries_count,
             "status": "success",
             "latency_ms": latency,
