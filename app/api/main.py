@@ -107,6 +107,7 @@ class QueryResponse(BaseModel):
     status: str
     confidence: str
     confidence_score: float
+    rewritten_query: str
     retries: int
     cost: float
     latency_ms: float
@@ -236,6 +237,7 @@ def run_query(
             status=result["status"],
             confidence=result["confidence"],
             confidence_score=result.get("confidence_score", 0.0),
+            rewritten_query=result.get("rewritten_query", ""),
             retries=result["retries"],
             cost=result["cost"],
             latency_ms=result["latency_ms"],

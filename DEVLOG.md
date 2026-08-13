@@ -266,4 +266,34 @@ To break the coincidentally identical retrieval metric scores (all showing `0.88
 - **Query Analyzer Acronym Guard**: Fixed hallucinated acronym expansions (e.g. rewriting "RAG" into fake terms) by preserving original user intent and routing `query_text` directly to downstream generator context.
 - **Interactive Citation Inspector Drawer**: Clicking any inline `[cite: uuid]` pill opens a slide-over drawer displaying the source document name, similarity score, and exact raw text chunk from Qdrant, providing full visual grounding transparency.
 
+---
+
+## 🚀 Milestone 11: Advanced Document Ingestion, Smart Chunking, Multimodal Image Analysis, and Numeric Confidence Scoring
+**Date**: August 13, 2026
+
+### 📋 Overview & Component Map
+
+| Component / File | Status | Description |
+| :--- | :---: | :--- |
+| [loader.py](file:///d:/agentic_rag/app/ingestion/loader.py) | `MODIFY` | Pure-Python Table extraction (`pdfplumber`), OCR fallback for scanned PDFs (`pytesseract` + `pdf2image`), and embedded image extraction (`PyMuPDF`). Returns a list of Documents (body text, tables, images). |
+| [image_understander.py](file:///d:/agentic_rag/app/ingestion/image_understander.py) | `NEW` | Multimodal Vision understanding. Uses **GPT-4o-mini Vision** (primary) and **Groq Llama 3.2 Vision** (fallback) to describe charts, graphs, and figures. |
+| [chunker.py](file:///d:/agentic_rag/app/ingestion/chunker.py) | `MODIFY` | Replaced recursive splitter with a **4-strategy Smart Chunking Router**: Table-Atomic (never split tables), Image-Atomic (vision descriptors), Section-Aware (heading split + token budget), and Semantic (sentence-similarity splits). |
+| [agent.py](file:///d:/agentic_rag/app/generation/agent.py) | `MODIFY` | Added a weighted numeric `confidence_score` (0.0-1.0 float) computed from: Rerank relevance (40%) + Critic grounding verdict (40%) + Retry penalty (20%). |
+| [main.py](file:///d:/agentic_rag/app/api/main.py) | `MODIFY` | Updated `/ingest` and `/ingest_file` to process multi-document outputs (text + tables + images), and updated `QueryResponse` to return the new float `confidence_score`. |
+| [test_edge_cases.py](file:///d:/agentic_rag/tests/test_edge_cases.py) | `NEW` | Added a comprehensive unit test suite (50 tests) verifying all edge cases across new chunking, parsing, scoring, and OCR paths. |
+| [ci.yml](file:///d:/agentic_rag/.github/workflows/ci.yml) | `MODIFY` | Updated GitHub Actions workflow to set up system packages (`tesseract-ocr`, `poppler-utils`) and run the test suite via `pytest`. |
+| [requirements.txt](file:///d:/agentic_rag/requirements.txt) | `MODIFY` | Added `pdf2image` and `pytesseract` to requirements. |
+
+### 📐 Design Decisions & Architectural Trade-offs
+- **Pure Python Table Parser**: Avoided paid/Java-based table extractors like `tabula-py` (which requires a JRE) in favor of the pure Python `pdfplumber` engine, keeping container deployments lightweight and dependency-free.
+- **Logical Table Casing Guard**: Table parsing is routed to `Table-Atomic` chunking. This forces the engine to treat the entire Markdown table layout as a single, contiguous vector, preventing context fragmentation (e.g. splitting a row from its headers).
+- **Graceful OCR/Vision Fallbacks**: OCR and vision descriptor generation fail silently back to standard text extraction if third-party binaries (Tesseract) or vision API keys are not configured, maintaining pipeline robustness.
+- **Multi-Vector Ingestion Split**: A single PDF is now ingested as a list of independent Documents (text, tables, images). This allows specialized chunking strategy assignments (e.g. semantic for prose vs atomic for tables) to be applied on a per-content basis.
+
+### 🐛 Challenges & Debugging Chronicles
+- **Windows Emoji EncodeError**: Custom test print commands using terminal emojis (`✅`) triggered `UnicodeEncodeError: 'charmap' codec can't encode character...` on Windows command hosts running `cp1252`. Resolved by refactoring prints to ASCII-safe strings (`PASS`, `FAIL`).
+- **GHA CI Runner Failures**: The initial push failed on GHA because the runner was missing `poppler-utils` and `tesseract-ocr` system packages required by OCR tests, and `pytest` was missing from the environment. Solved by amending `ci.yml` with system setup steps and swapping `unittest` for `pytest`.
+- **Duplicate Document UUID Hash Collision**: Combining multiple documents into a single ingestion batch created ID collisions when relying solely on filenames. Fixed by incorporating sequential `chunk_index` alongside text content inside the version-5 deterministic UUID formula.
+
+
 

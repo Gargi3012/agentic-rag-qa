@@ -11,47 +11,88 @@ This repository implements a production-grade, highly cost-optimized **Agentic R
 Retrieval embedding cost is kept strictly at **$0.00** by generating dense embeddings (`all-MiniLM-L6-v2`) and sparse indices (BM25) locally. Generation cost is optimized via relevance gating (short-circuiting unanswerable questions) and sentence-level context compression.
 
 ---
-
 ## 📐 System Architecture Diagram
 
 ```text
-                  [User Input Query (UI / HTTP POST)]
-                                  │
-                          [Query Analyzer]  (Structured expansion guard, max 1)
-                                  │
-                          [Hybrid Retrieval]
-                 ┌────────────────┴────────────────┐
-          (Dense Vector: 384d)             (Sparse Vector: BM25)
-          [all-MiniLM-L6-v2]              [FastEmbed Qdrant/bm25]
-                 └────────────────┬────────────────┘
-                                  ▼
-                      [Server-Side Qdrant RRF (k=60)]
-                                  │
-                    [Cross-Encoder Local Reranker]
-                     (ms-marco-MiniLM-L-6-v2)
-                                  │
-                         [Relevance Gate] ──(Score < 0.001)──> [Refusal: "insufficient context"]
-                                  │
-                         (Score >= 0.001)
-                                  ▼
-                       [Sentence Context Compressor] (Top query-aligned sentences)
-                                  │
-                       [Grounded Generator] (Groq Llama-3.1-8b with [cite: chunk_id])
-                                  │
-                       [Independent Critic Pass] (OpenAI GPT-4o-mini Grounding Check)
-                             /         \
-                       (Failed)       (Passed)
-                          │               │
-             [1-Time Retry w/ Feedback]   │
-                          └───────────────┤
-                                          ▼
-                                   [Final QA Output] (Answer + Inline Citations + Telemetry)
+===================================================================================
+                               SYSTEM ARCHITECTURE
+===================================================================================
+
+[ Ingestion Pipeline ]
+  Document Source File (PDF, HTML, MD)
+           │
+  ┌────────┼────────┐
+  ▼        ▼        ▼
+ [Text] [Tables] [Images]
+  │        │        │
+  │        │        ▼
+  │        │   [Vision Models]
+  │        ▼   (GPT-4o-mini / Llama 3.2 Vision)
+  │    [MD Table]   │
+  ▼        ▼        ▼
+ ┌───────────────────┐
+ │Smart Chunk Router │
+ ├───────────────────┤
+ │ • Table-Atomic    │
+ │ • Image-Atomic    │
+ │ • Section-Aware   │
+ │ • Semantic        │
+ └─────────┬─────────┘
+           ▼
+     [Qdrant DB] ◄──────────────────────────────────────────────┐
+  (Dense + Sparse Index)                                         │
+                                                                 │
+─────────────────────────────────────────────────────────────────┼─────────────────
+                                                                 │
+[ Query Pipeline ]                                               │
+  User Input Query (UI / HTTP POST)                              │
+           │                                                     │
+           ▼                                                     │
+    [Query Analyzer] (Structured expansion guard, max 1)         │
+           │                                                     │
+           ▼                                                     │
+   [Hybrid Retrieval] ───────────────────────────────────────────┘
+           │
+           ▼
+    [Qdrant RRF Fusion (k=60)]
+           │
+           ▼
+  [Cross-Encoder Reranker] (ms-marco-MiniLM-L-6-v2)
+           │
+           ▼
+   [Relevance Gate] ──(Score < 0.001)──> [Refusal: "insufficient context"]
+           │
+      (Score >= 0.001)
+           ▼
+  [Sentence Context Compressor] (Top query-aligned sentences)
+           │
+           ▼
+  [Grounded Generator] (Groq Llama-3.1-8b with [cite: chunk_id])
+           │
+           ▼
+  [Independent Critic Pass] (OpenAI GPT-4o-mini Grounding Check)
+        /     \
+    (Failed)  (Passed)
+       │         │
+  [1-Time Retry] │
+       └─────────┼────────┐
+                 ▼        ▼
+         [Final QA Output] (Answer + Inline Citations + Confidence telemetry)
 ```
 
 ---
 
 ## 🚀 Key Features
 
+- **Advanced Document Ingestion (Pure Python)**:
+  - **Table Extraction**: Uses `pdfplumber` to extract tables page-by-page and convert them into clean, indexable Markdown tables. No Java dependencies.
+  - **OCR for Scanned PDFs**: Implements a robust `pytesseract` + `pdf2image` fallback to parse image-only scanned files.
+  - **Multimodal Vision descriptions**: Automatically extracts embedded figures, graphs, and images via PyMuPDF and utilizes **GPT-4o-mini Vision** (primary) and **Groq Llama 3.2 Vision** (fallback) to generate textual labels, trends, and descriptions.
+- **Smart Chunking Router**: Auto-selects the optimal strategy based on the document type:
+  - *Table-Atomic*: Keeps tables completely intact, avoiding formatting loss mid-row.
+  - *Image-Atomic*: Encapsulates multimodal descriptions in single atomic chunks.
+  - *Section-Aware*: Splits at Markdown headers, ALL-CAPS titles, or numbered lines first, preserving heading labels in chunk metadata.
+  - *Semantic*: Cosine similarity-based splitting between adjacent sentences via local embeddings.
 - **Local Hybrid Search**: Combines local semantic search (dense SentenceTransformers `all-MiniLM-L6-v2`) and keyword search (Qdrant FastEmbed BM25) fused server-side using **Reciprocal Rank Fusion (RRF)**.
 - **Agentic Self-Correction Loop**:
   - **Query Analyzer**: Automatically resolves ambiguous pronouns without hallucinating acronyms.
@@ -59,12 +100,14 @@ Retrieval embedding cost is kept strictly at **$0.00** by generating dense embed
   - **Relevance Gate**: Refuses out-of-domain queries immediately (`score < 0.001`), saving 100% of LLM generation costs.
   - **Contextual Compressor**: Sentence-level keyword overlap extractor reduces token payload.
   - **Cross-Model Critic Guardrail**: Independent **OpenAI `gpt-4o-mini`** inspects **Groq Llama 3.1** candidate outputs to eliminate self-enhancement bias, triggering 1 feedback retry on hallucination detection.
+  - **Composite Confidence Scoring**: Provides a numeric `confidence_score` (0.0-1.0 float) computed from weighted factors: `0.40 * rerank_score` + `0.40 * grounding_score` + `0.20 * retry_penalty`.
 - **Enterprise Security & Telemetry**:
   - **API Header Authentication**: Protects endpoints using header-bound `X-API-Key` checks.
   - **Sliding-Window Rate Limiter**: Thread-safe memory sliding tracker per API key.
   - **Structured JSON Logging**: Custom logger capturing structured event traces and latency metrics.
   - **Interactive Groundwork UI**: Single-page frontend with drag-and-drop ingestion, 1-click query chips, and "How It Works" modal.
 - **Evaluation Harness**: Automated benchmarking measuring Recall@k, Hit Rate, MRR, nDCG@k, Context Precision, EM, F1, and LLM-as-a-judge faithfulness/relevance scores.
+
 
 ---
 
@@ -84,8 +127,9 @@ Retrieval embedding cost is kept strictly at **$0.00** by generating dense embed
 │   ├── generation/
 │   │   └── agent.py          # Query analyzer, generator, and critique loop
 │   ├── ingestion/
-│   │   ├── loader.py         # PDF (PyMuPDF), HTML (BS4), & Markdown parser
-│   │   ├── chunker.py        # Token-based recursive character splitter
+│   │   ├── loader.py         # PDF (PyMuPDF + pdfplumber), HTML, & Markdown parser
+│   │   ├── image_understander.py # Multimodal Vision analyst (GPT-4o-mini + Groq Llama 3.2 fallback)
+│   │   ├── chunker.py        # Smart chunking router (Table, Image, Section, Semantic)
 │   │   └── dedup.py          # Deterministic hash-based duplicate prevention
 │   └── retrieval/
 │       ├── dense_embed.py    # Local SentenceTransformer generator
@@ -96,12 +140,14 @@ Retrieval embedding cost is kept strictly at **$0.00** by generating dense embed
 ├── docker/
 │   └── Dockerfile            # Multi-stage python-slim deployment container
 ├── tests/
-│   └── test_core.py          # Core unit test suite
+│   ├── test_core.py          # Core unit test suite
+│   └── test_edge_cases.py    # Comprehensive edge case test suite (50 unit tests)
 ├── docker-compose.yml        # Orchestrates Qdrant server container
 ├── requirements.txt          # Python project dependencies
 ├── DEVLOG.md                 # Iterative milestone log diary
 ├── eval_report.md            # Rendered evaluation benchmark report
 └── eval_results.json         # Raw metrics results trace
+
 ```
 
 ---
@@ -196,6 +242,7 @@ All endpoints (except `/health`) require the `X-API-Key` header matching the `AP
       }
     ],
     "confidence": "high",
+    "confidence_score": 0.9412,
     "retries": 0,
     "status": "success",
     "latency_ms": 4200.5,
@@ -246,7 +293,12 @@ python -m unittest tests/test_core.py
 ## 📐 Design Decisions & Architectural Trade-offs
 
 ### 1. Chunking Strategy & Rationale
-We implemented a semantic-aware, token-budgeted recursive character splitter (`TokenRecursiveCharacterSplitter`). It splits text recursively by structural separators (first `\n\n`, then `\n`, then `" "`) to keep sentences and paragraphs intact. It counts splits in tokens using the `tiktoken` tokenizer (`cl100k_base` model) instead of characters, preventing context fragmentation while keeping chunks strictly within model token budgets.
+We migrated from simple token-based splitters to a 4-strategy smart chunking router (`chunk_document`):
+- **Table-Atomic**: Extracted tables (pdfplumber) are preserved as markdown blocks to guarantee logical alignment in tabular data representation without row segmentation loss.
+- **Image-Atomic**: Graph/chart figures described by vision models are indexed as discrete description paragraphs.
+- **Section-Aware**: Breaks larger documents at headings/ALL-CAPS sections to preserve local semantic context and context metadata headers.
+- **Semantic**: Combines adjacent sentences based on embedding-similarity vectors to split content logically at subject boundaries.
+A recursive token-based character splitter (`TokenRecursiveCharacterSplitter`) is maintained as the default fallback logic.
 
 ### 2. Embedding Model Cost/Quality Trade-offs
 To keep embedding costs at **$0.00**, we utilize local models:

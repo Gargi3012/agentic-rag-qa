@@ -177,6 +177,20 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:12.5px;box-shadow:var(--shadow-md);opacity:0;pointer-events:none;transition:opacity 0.25s ease,transform 0.25s ease;z-index:70;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast.err{background:#B23A2E;}
+
+  /* Pipeline Trace styling */
+  .trace-container { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .warn .trace-container { border-top-color: var(--warn-line); }
+  .trace-btn { background: none; border: none; font-size: 11px; font-weight: 600; color: var(--accent); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 0; outline: none; }
+  .warn .trace-btn { color: var(--warn); }
+  .trace-btn:hover { opacity: 0.8; }
+  .trace-content { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.5; color: var(--ink-muted); display: flex; flex-direction: column; gap: 4px; }
+  .trace-content.open { max-height: 220px; margin-top: 8px; }
+  .trace-step { display: flex; align-items: flex-start; gap: 6px; }
+  .trace-step .icon { font-weight: 700; flex-shrink: 0; }
+  .trace-step.done .icon { color: var(--ok); }
+  .trace-step.fail .icon { color: #C0392B; }
+  .trace-step.skip .icon { color: var(--ink-faint); }
 </style>
 </head>
 <body>
@@ -228,36 +242,36 @@
       <div class="step-card">
         <div class="step-num">1</div>
         <div class="step-content">
-          <h4>Idempotent Ingestion & Chunking</h4>
-          <p>Recursive 512-token splitting with 50-token overlap. Deterministic UUIDv5 prevents duplicate vector creation on re-ingest.</p>
+          <h4>Multi-Doc Ingestion & OCR</h4>
+          <p>Extracts body text, parsed tables (as Markdown), and embedded figures/images. Implements robust OCR fallbacks (pytesseract+pdf2image) for image-only scanned files.</p>
         </div>
       </div>
       <div class="step-card">
         <div class="step-num">2</div>
         <div class="step-content">
-          <h4>Zero-Cost Local Hybrid Search</h4>
-          <p>Combines local dense vectors (<code>all-MiniLM-L6-v2</code>) and BM25 sparse weights fused via Qdrant's server-side Reciprocal Rank Fusion (RRF).</p>
+          <h4>Multimodal Vision & 4-Strategy Chunking</h4>
+          <p>Embedded charts/figures described via GPT-4o-mini Vision (Groq fallback). Chunks routed via 4 strategies: Table-Atomic, Image-Atomic, Section-Aware (headings), or Semantic (SentenceTransformers).</p>
         </div>
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Zero-Cost Hybrid Retrieval</h4>
+          <p>Combines local dense vectors (<code>all-MiniLM-L6-v2</code>) and BM25 sparse weights fused via Qdrant's server-side Reciprocal Rank Fusion (RRF).</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
         <div class="step-content">
           <h4>Cross-Encoder & Relevance Gate</h4>
           <p>Reranks top candidates with <code>ms-marco-MiniLM-L-6-v2</code>. Out-of-domain queries failing the 0.001 sigmoid threshold are immediately refused to save 100% of LLM costs.</p>
         </div>
       </div>
       <div class="step-card">
-        <div class="step-num">4</div>
-        <div class="step-content">
-          <h4>Sentence Compression & Grounded Generation</h4>
-          <p>Extracts top query-aligned sentences per chunk. Groq <code>llama-3.1-8b-instant</code> generates answers strictly citing <code>[cite: chunk_id]</code>.</p>
-        </div>
-      </div>
-      <div class="step-card">
         <div class="step-num">5</div>
         <div class="step-content">
-          <h4>Cross-Model Critic Guardrail</h4>
-          <p>Independent <strong>OpenAI <code>gpt-4o-mini</code></strong> inspects the generated output to eliminate self-enhancement bias, triggering 1 feedback retry if hallucinations are detected.</p>
+          <h4>Critic Guardrail & Confidence Score</h4>
+          <p>OpenAI <code>gpt-4o-mini</code> inspects response grounding (1 retry limit). Computes a weighted 0-1 confidence score based on grounding verdict, rerank relevance, and retry count.</p>
         </div>
       </div>
     </div>
@@ -537,7 +551,12 @@
   function renderAnswer(question, data){
     els.feedEmpty.style.display = 'none';
     var insufficient = /insufficient context/i.test(data.answer || '') || data.status === 'relevance_gate_refusal';
-    var pct = confidencePct(data.confidence);
+    
+    // Utilize composite numeric confidence_score from backend if present, else fallback
+    var pct = (data.confidence_score !== undefined && data.confidence_score !== null)
+      ? data.confidence_score
+      : confidencePct(data.confidence);
+
     var r = 10, c = 2 * Math.PI * r;
     var offset = c * (1 - (insufficient ? 0.12 : (pct || 0)));
     var label = pct === null ? '&mdash;' : Math.round(pct * 100) + '%';
@@ -566,9 +585,57 @@
 
     var copyBtnHtml = '<div class="card-top-action"><button class="copy-btn" title="Copy answer">📋 Copy</button></div>';
 
+    // Build pipeline trace log steps
+    var traceStepsHtml = '';
+    
+    // Step 1: Query Analyzer
+    var qAnalyzerOk = data.status !== 'empty_query_refusal';
+    var qAnalyzerTxt = qAnalyzerOk ? 'Query Analyzed: ' + (data.rewritten_query ? '"' + escHtml(data.rewritten_query) + '"' : 'Original query preserved') : 'Query was empty';
+    traceStepsHtml += '<div class="trace-step ' + (qAnalyzerOk ? 'done' : 'fail') + '"><span class="icon">' + (qAnalyzerOk ? '✓' : '✗') + '</span><span>' + qAnalyzerTxt + '</span></div>';
+
+    // Step 2: Hybrid Retrieval
+    var retrievalOk = data.status !== 'empty_query_refusal' && data.status !== 'relevance_gate_refusal';
+    var retrievedCount = chunks.length ? chunks.length + ' chunks fetched' : '0 chunks fetched';
+    var retrievalTxt = retrievalOk ? 'Qdrant Hybrid Search: Fused Dense + Sparse BM25 (' + retrievedCount + ')' : 'Search bypassed';
+    traceStepsHtml += '<div class="trace-step ' + (retrievalOk ? 'done' : 'skip') + '"><span class="icon">' + (retrievalOk ? '✓' : '○') + '</span><span>' + retrievalTxt + '</span></div>';
+
+    // Step 3: Relevance Gate & Reranker
+    var rerankScore = data.rerank_score != null ? Math.round(data.rerank_score * 1000) / 1000 : null;
+    var gatePassed = data.status !== 'relevance_gate_refusal' && data.status !== 'empty_query_refusal';
+    var gateStatusClass = gatePassed ? 'done' : (data.status === 'relevance_gate_refusal' ? 'fail' : 'skip');
+    var gateIcon = gatePassed ? '✓' : (data.status === 'relevance_gate_refusal' ? '✗' : '○');
+    var gateTxt = 'Relevance Gate: ';
+    if (rerankScore !== null) {
+      gateTxt += 'Cross-Encoder Rerank score: ' + rerankScore + ' (Gate: ' + (gatePassed ? 'PASSED' : 'REJECTED') + ')';
+    } else {
+      gateTxt += gatePassed ? 'Passed' : 'Bypassed';
+    }
+    traceStepsHtml += '<div class="trace-step ' + gateStatusClass + '"><span class="icon">' + gateIcon + '</span><span>' + gateTxt + '</span></div>';
+
+    // Step 4: Grounded Generation
+    var genOk = gatePassed && !insufficient;
+    var genStatusClass = genOk ? 'done' : (insufficient ? 'fail' : 'skip');
+    var genIcon = genOk ? '✓' : (insufficient ? '✗' : '○');
+    var genTxt = 'Grounded Generation: ' + (genOk ? 'Groq Llama 3.1 generated answer' : (insufficient ? 'Refused - Insufficient document context' : 'Bypassed'));
+    traceStepsHtml += '<div class="trace-step ' + genStatusClass + '"><span class="icon">' + genIcon + '</span><span>' + genTxt + '</span></div>';
+
+    // Step 5: Critic Grounding Check
+    var criticOk = genOk && data.confidence !== 'low';
+    var criticStatusClass = criticOk ? 'done' : (data.confidence === 'low' ? 'fail' : 'skip');
+    var criticIcon = criticOk ? '✓' : (data.confidence === 'low' ? '✗' : '○');
+    var criticTxt = 'Critic Guardrail Pass: ';
+    if (genOk) {
+      criticTxt += (data.retries > 0 ? 'Passed on retry #' + data.retries + ' (GPT-4o-mini judge)' : 'Passed on first attempt');
+    } else {
+      criticTxt += 'Bypassed';
+    }
+    traceStepsHtml += '<div class="trace-step ' + criticStatusClass + '"><span class="icon">' + criticIcon + '</span><span>' + criticTxt + '</span></div>';
+
+    var traceHtml = '<div class="trace-container"><button class="trace-btn" type="button">🔍 View Pipeline Execution Trace</button><div class="trace-content">' + traceStepsHtml + '</div></div>';
+
     var block = document.createElement('div');
     block.className = 'qa-block';
-    block.innerHTML = '<div class="qa-question"><span class="qmark">Q&middot;</span>'+escHtml(question)+'</div><div class="answer-card'+(insufficient ? ' warn' : '')+'">'+copyBtnHtml+'<div class="answer-text">'+answerHtml+'</div><div class="answer-meta">'+meta+'</div></div>';
+    block.innerHTML = '<div class="qa-question"><span class="qmark">Q&middot;</span>'+escHtml(question)+'</div><div class="answer-card'+(insufficient ? ' warn' : '')+'">'+copyBtnHtml+'<div class="answer-text">'+answerHtml+'</div><div class="answer-meta">'+meta+'</div>' + traceHtml + '</div>';
     els.feed.prepend(block);
 
     // Copy Handler
@@ -579,6 +646,18 @@
           copyBtn.textContent = '✓ Copied!';
           setTimeout(function(){ copyBtn.textContent = '📋 Copy'; }, 2000);
         });
+      });
+    }
+
+    // Trace Accordion Click Listener
+    var traceBtn = block.querySelector('.trace-btn');
+    var traceContent = block.querySelector('.trace-content');
+    if(traceBtn && traceContent) {
+      traceBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var isOpen = traceContent.classList.contains('open');
+        traceContent.classList.toggle('open');
+        traceBtn.innerHTML = isOpen ? '🔍 View Pipeline Execution Trace' : '▼ Hide Pipeline Execution Trace';
       });
     }
 

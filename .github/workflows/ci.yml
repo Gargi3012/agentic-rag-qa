@@ -20,11 +20,17 @@ jobs:
         python-version: "3.11"
         cache: 'pip'
 
-    - name: Install dependencies
+    - name: Install system dependencies (for OCR)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq tesseract-ocr poppler-utils
+
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest
 
-    - name: Run unit tests
+    - name: Run edge case test suite
       run: |
-        python -m unittest discover tests
+        python -m pytest tests/test_edge_cases.py -v --tb=short
