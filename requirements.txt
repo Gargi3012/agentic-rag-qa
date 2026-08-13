@@ -18,6 +18,8 @@ pymupdf>=1.24.2
 pdfplumber>=0.11.0
 beautifulsoup4>=4.12.3
 markdown>=3.6
+pdf2image>=1.16.3
+pytesseract>=0.3.10
 
 # Utilities
 python-dotenv>=1.0.1

@@ -12,6 +12,19 @@ try:
 except ImportError:
     _HAS_PDFPLUMBER = False
 
+try:
+    from PIL import Image
+    import pytesseract
+    _HAS_TESSERACT = True
+except ImportError:
+    _HAS_TESSERACT = False
+
+try:
+    from pdf2image import convert_from_path
+    _HAS_PDF2IMAGE = True
+except ImportError:
+    _HAS_PDF2IMAGE = False
+
 logger = logging.getLogger("agentic_rag.ingestion.loader")
 
 
@@ -99,13 +112,49 @@ def _extract_with_pdfplumber(file_path: str) -> Optional[str]:
         return None
 
 
+def _ocr_page_image(pil_image) -> str:
+    """Runs pytesseract OCR on a PIL image and returns extracted text."""
+    if not _HAS_TESSERACT:
+        return ""
+    try:
+        return pytesseract.image_to_string(pil_image, lang="eng").strip()
+    except Exception as e:
+        logger.warning(f"pytesseract OCR failed on page image: {e}")
+        return ""
+
+
+def extract_text_via_ocr(file_path: str) -> Optional[str]:
+    """
+    Converts PDF pages to images then runs OCR (pytesseract + pdf2image).
+    Pure Python — used as last-resort fallback for scanned/image-only PDFs.
+    Returns None if neither pdf2image nor pytesseract is installed.
+    """
+    if not _HAS_PDF2IMAGE or not _HAS_TESSERACT:
+        missing = []
+        if not _HAS_PDF2IMAGE:
+            missing.append("pdf2image")
+        if not _HAS_TESSERACT:
+            missing.append("pytesseract/Pillow")
+        logger.warning(f"OCR skipped -- missing: {', '.join(missing)}")
+        return None
+    try:
+        logger.info(f"Running OCR on scanned PDF: {file_path} ...")
+        pil_pages = convert_from_path(file_path, dpi=200)
+        page_texts = [_ocr_page_image(p) for p in pil_pages]
+        text = "\n\n".join(t for t in page_texts if t)
+        return text if text.strip() else None
+    except Exception as e:
+        logger.error(f"OCR extraction failed for {file_path}: {e}")
+        return None
+
+
 def extract_pdf_text(file_path: str) -> Optional[str]:
     """
     Extracts text from a PDF file.
     Strategy:
       1. PyMuPDF — fast, accurate for text-based PDFs.
       2. pdfplumber fallback — handles more encoding variants.
-    Scanned/image-only PDFs will still return None (OCR added separately).
+      3. pytesseract OCR — last-resort for scanned/image-only PDFs.
     """
     try:
         doc = pymupdf.open(file_path)
@@ -128,7 +177,14 @@ def extract_pdf_text(file_path: str) -> Optional[str]:
         logger.info(f"pdfplumber successfully extracted text from {file_path}")
         return fallback
 
-    logger.warning(f"Both extractors failed for {file_path}. PDF may be scanned/image-only.")
+    # --- Fallback 3: OCR (pytesseract + pdf2image) ---
+    logger.warning(f"Both text extractors failed for {file_path}. Trying OCR...")
+    ocr_text = extract_text_via_ocr(file_path)
+    if ocr_text:
+        logger.info(f"OCR successfully extracted text from scanned PDF: {file_path}")
+        return ocr_text
+
+    logger.warning(f"All extractors failed for {file_path}. PDF may be encrypted or corrupt.")
     return None
 
 
