@@ -106,6 +106,7 @@ class QueryResponse(BaseModel):
     answer: str
     status: str
     confidence: str
+    confidence_score: float
     retries: int
     cost: float
     latency_ms: float
@@ -153,7 +154,7 @@ def ingest_documents(
     """
     t_start = time.time()
     try:
-        # Load documents
+        # Load documents — now returns List[Document] (text + tables + images per file)
         docs = load_directory(request.directory_path)
         if not docs:
             logger.warning(f"No valid documents found in directory: {request.directory_path}")
@@ -165,7 +166,7 @@ def ingest_documents(
                 time_taken_seconds=time.time() - t_start
             )
 
-        # Chunk documents
+        # Chunk documents (smart router: table-atomic / section-aware / semantic)
         all_chunks = []
         files_processed = list(set(doc.metadata["filename"] for doc in docs))
         for doc in docs:
@@ -175,7 +176,7 @@ def ingest_documents(
         # Deduplicate chunks in-batch
         unique_chunks = deduplicate_chunks(all_chunks)
 
-        # Upsert into Qdrant (checking for pre-existing IDs inside to save embedding costs)
+        # Upsert into Qdrant (checks pre-existing IDs to save embedding costs)
         chunks_upserted = store.upsert_chunks(unique_chunks)
 
         return IngestResponse(
@@ -234,6 +235,7 @@ def run_query(
             answer=result["answer"],
             status=result["status"],
             confidence=result["confidence"],
+            confidence_score=result.get("confidence_score", 0.0),
             retries=result["retries"],
             cost=result["cost"],
             latency_ms=result["latency_ms"],
@@ -294,48 +296,51 @@ def ingest_single_file(
     """
     t_start = time.time()
     try:
-        # Save file to a temporary file
+        # Save uploaded file to a temporary location
         suffix = os.path.splitext(file.filename)[1]
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
-            
-        # Extract filename
+
         original_filename = file.filename
-        
-        # Load the single file using loader
+
+        # Load — returns List[Document] (text + tables + images)
         from app.ingestion.loader import load_file
-        doc = load_file(tmp_path)
-        
+        docs = load_file(tmp_path)
+
         # Clean up temporary file
         try:
             os.unlink(tmp_path)
         except Exception:
             pass
-            
-        if not doc:
+
+        if not docs:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unsupported or unparseable file format: {original_filename}"
             )
-            
-        # Restore original filename in metadata
-        doc.metadata["filename"] = original_filename
-        doc.metadata["file_path"] = f"uploads/{original_filename}"
-        
-        # Chunk
-        chunks = chunk_document(doc, chunk_size=Config.CHUNK_SIZE, chunk_overlap=Config.CHUNK_OVERLAP)
-        
+
+        # Restore original filename in metadata for all sub-documents
+        for doc in docs:
+            doc.metadata["filename"] = original_filename
+            doc.metadata["file_path"] = f"uploads/{original_filename}"
+
+        # Chunk all sub-documents (smart router)
+        all_chunks = []
+        for doc in docs:
+            chunks = chunk_document(doc, chunk_size=Config.CHUNK_SIZE, chunk_overlap=Config.CHUNK_OVERLAP)
+            all_chunks.extend(chunks)
+
         # Deduplicate
-        unique_chunks = deduplicate_chunks(chunks)
-        
+        unique_chunks = deduplicate_chunks(all_chunks)
+
         # Upsert
         chunks_upserted = store.upsert_chunks(unique_chunks)
-        
-        # Return count
+
         return {
             "status": "success",
             "filename": original_filename,
+            "sub_documents": len(docs),
             "chunks_added": chunks_upserted,
             "chunks_skipped": len(unique_chunks) - chunks_upserted,
             "time_taken_seconds": time.time() - t_start
