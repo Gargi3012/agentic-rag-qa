@@ -24,7 +24,7 @@ class CriticCheck(BaseModel):
 
 def _groq_style_structured_call(client, messages, response_format, **kwargs):
     """Structured call using json_object mode — Groq and OpenAI compatible."""
-    model = kwargs.get("model", "llama-3.1-8b-instant")
+    model = kwargs.get("model", Config.GROQ_MODEL)
     msgs = list(messages)
     schema_desc = json.dumps(response_format.model_json_schema())
     hint = f"IMPORTANT: Return ONLY a valid JSON object strictly adhering to this schema:\n{schema_desc}"
@@ -107,8 +107,8 @@ def call_llm_with_backoff(client: OpenAI, messages: List[Dict[str, str]], respon
     if fallback_client:
         logger.info("Executing fallback call to Groq client...")
         try:
-            # Replace model with Groq Llama 3.1 8B model
-            groq_model = "llama-3.1-8b-instant"
+            # Replace model with Groq model
+            groq_model = Config.GROQ_MODEL
             
             if response_format:
                 # Groq doesn't support beta.chat.completions.parse, so use json_object mode
@@ -222,8 +222,8 @@ def compress_context(chunk_text: str, query: str, max_sentences: int = 6) -> str
 
 
 class AgenticQueryPipeline:
-    # Generator model: Groq Llama 3.1
-    GROQ_MODEL = "llama-3.1-8b-instant"
+    # Generator model
+    GROQ_MODEL = Config.GROQ_MODEL
     # Judge model: OpenAI GPT-4o-mini
     JUDGE_MODEL = "gpt-4o-mini"
 

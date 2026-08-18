@@ -217,7 +217,7 @@ def _semantic_chunk(doc: Document, chunk_size: int, chunk_overlap: int,
     Falls back to section-aware chunking if sentence-transformers unavailable.
     """
     try:
-        from sentence_transformers import SentenceTransformer
+        from fastembed import TextEmbedding
         import numpy as np
 
         enc = _get_encoding()
@@ -229,7 +229,7 @@ def _semantic_chunk(doc: Document, chunk_size: int, chunk_overlap: int,
 
         # Load a lightweight model for similarity (already installed in project)
         _model_cache = _get_semantic_model()
-        embeddings = _model_cache.encode(sentences, batch_size=32, show_progress_bar=False)
+        embeddings = list(_model_cache.embed(sentences))
 
         # Compute cosine similarity between consecutive sentences
         def cosine_sim(a, b):
@@ -270,7 +270,7 @@ def _semantic_chunk(doc: Document, chunk_size: int, chunk_overlap: int,
         return chunks
 
     except ImportError:
-        logger.warning("sentence-transformers not available. Falling back to section-aware chunking.")
+        logger.warning("fastembed not available. Falling back to section-aware chunking.")
         return _section_aware_chunk(doc, chunk_size, chunk_overlap)
     except Exception as e:
         logger.warning(f"Semantic chunking failed ({e}). Falling back to section-aware chunking.")
@@ -283,9 +283,9 @@ _semantic_model_instance = None
 def _get_semantic_model():
     global _semantic_model_instance
     if _semantic_model_instance is None:
-        from sentence_transformers import SentenceTransformer
-        logger.info("Loading semantic chunking model (all-MiniLM-L6-v2)...")
-        _semantic_model_instance = SentenceTransformer("all-MiniLM-L6-v2")
+        from fastembed import TextEmbedding
+        logger.info("Loading semantic chunking model (sentence-transformers/all-MiniLM-L6-v2)...")
+        _semantic_model_instance = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         logger.info("Semantic chunking model loaded.")
     return _semantic_model_instance
 

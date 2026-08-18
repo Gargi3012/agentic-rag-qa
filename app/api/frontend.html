@@ -236,7 +236,7 @@
     <button class="modal-close" id="aboutClose">&times;</button>
     <h3 class="modal-title">How Groundwork RAG Works</h3>
     <p class="modal-desc">
-      A production-grade, zero-embedding-cost Agentic QA architecture built with FastAPI, Qdrant Hybrid Search, Groq Llama 3.1 Generator, and OpenAI GPT-4o-mini Critic Judge.
+      A production-grade, zero-embedding-cost Agentic QA architecture built with FastAPI, Qdrant Hybrid Search, Groq Generator, and OpenAI GPT-4o-mini Critic Judge.
     </p>
     <div class="pipeline-steps">
       <div class="step-card">
@@ -616,7 +616,7 @@
     var genOk = gatePassed && !insufficient;
     var genStatusClass = genOk ? 'done' : (insufficient ? 'fail' : 'skip');
     var genIcon = genOk ? '✓' : (insufficient ? '✗' : '○');
-    var genTxt = 'Grounded Generation: ' + (genOk ? 'Groq Llama 3.1 generated answer' : (insufficient ? 'Refused - Insufficient document context' : 'Bypassed'));
+    var genTxt = 'Grounded Generation: ' + (genOk ? 'Groq generated answer' : (insufficient ? 'Refused - Insufficient document context' : 'Bypassed'));
     traceStepsHtml += '<div class="trace-step ' + genStatusClass + '"><span class="icon">' + genIcon + '</span><span>' + genTxt + '</span></div>';
 
     // Step 5: Critic Grounding Check
